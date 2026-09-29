@@ -1,0 +1,185 @@
+/* ------------------------------------------------------------------
+   devKitCat — global styles & design tokens
+   ------------------------------------------------------------------ */
+
+:root {
+  color-scheme: dark;
+
+  /* Surfaces */
+  --bg: #0a0c11;
+  --bg-raise: #0e1118;
+  --surface: #12151d;
+  --surface-hover: #171b25;
+
+  /* Borders */
+  --border: rgba(148, 163, 184, 0.12);
+  --border-strong: rgba(148, 163, 184, 0.24);
+
+  /* Text */
+  --text: #e9ecf4;
+  --text-muted: #a3acc1;
+  --text-faint: #737d94;
+
+  /* Accent — restrained indigo */
+  --accent: #5d7df9;
+  --accent-strong: #7290fb;
+  --accent-contrast: #ffffff;
+  --accent-soft: rgba(93, 125, 249, 0.14);
+  --accent-faint: rgba(93, 125, 249, 0.08);
+
+  /* Radii */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+
+  /* Layout */
+  --container-max: 1120px;
+  --gutter: clamp(1.25rem, 4vw, 2rem);
+  --section-y: clamp(4rem, 9vw, 6.5rem);
+
+  /* Type */
+  --font-sans:
+    var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", Roboto, sans-serif;
+  --font-mono:
+    var(--font-geist-mono), ui-monospace, "SF Mono", Menlo, Consolas,
+    monospace;
+}
+
+/* Base
+   ------------------------------------------------------------------ */
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+body {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  font-weight: 600;
+  text-wrap: balance;
+}
+
+p {
+  text-wrap: pretty;
+}
+
+a {
+  color: var(--accent-strong);
+  text-decoration: none;
+}
+
+img,
+svg,
+video {
+  display: block;
+  max-width: 100%;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+/* Visible, consistent focus states everywhere. */
+:focus-visible {
+  outline: 2px solid var(--accent-strong);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+::selection {
+  background: rgba(93, 125, 249, 0.35);
+  color: #ffffff;
+}
+
+/* Layout primitives
+   ------------------------------------------------------------------ */
+
+.container {
+  width: 100%;
+  max-width: var(--container-max);
+  margin-inline: auto;
+  padding-inline: var(--gutter);
+}
+
+/* Grid for product-style cards (3 columns on desktop). */
+.card-grid {
+  display: grid;
+  gap: clamp(1rem, 2.5vw, 1.5rem);
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 285px), 1fr));
+}
+
+/* Grid for category cards (4 columns on desktop). */
+.category-grid {
+  display: grid;
+  gap: clamp(1rem, 2.5vw, 1.5rem);
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 230px), 1fr));
+}
+
+/* Standard vertical rhythm for page sections. */
+.section {
+  padding-block: var(--section-y);
+}
+
+/* Skip link
+   ------------------------------------------------------------------ */
+
+.skip-link {
+  position: absolute;
+  top: 0.75rem;
+  left: 0.75rem;
+  z-index: 100;
+  padding: 0.6rem 1rem;
+  background: var(--accent);
+  color: var(--accent-contrast);
+  font-weight: 600;
+  font-size: 0.9rem;
+  border-radius: var(--radius-sm);
+  transform: translateY(-200%);
+  transition: transform 0.15s ease;
+}
+
+.skip-link:focus-visible {
+  transform: translateY(0);
+}

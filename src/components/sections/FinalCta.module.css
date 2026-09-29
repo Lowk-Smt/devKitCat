@@ -1,0 +1,61 @@
+.section {
+  background: var(--bg);
+  padding-block: 0 var(--section-y);
+}
+
+.panel {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2rem;
+  text-align: center;
+  padding: clamp(2.25rem, 6vw, 3.5rem) clamp(1.5rem, 5vw, 3rem);
+  background:
+    radial-gradient(
+      80% 120% at 50% 0%,
+      rgba(93, 125, 249, 0.14) 0%,
+      transparent 60%
+    ),
+    var(--surface);
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius-lg) + 4px);
+}
+
+/* Thin accent line across the top of the panel. */
+.panel::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 10%;
+  right: 10%;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(93, 125, 249, 0.7),
+    transparent
+  );
+}
+
+.copy {
+  max-width: 34rem;
+}
+
+.title {
+  font-size: clamp(1.6rem, 3.5vw, 2.2rem);
+}
+
+.description {
+  margin-top: 0.9rem;
+  color: var(--text-muted);
+  font-size: 1.02rem;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.85rem;
+}
