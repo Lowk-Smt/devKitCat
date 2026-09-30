@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { ProductThumbnail } from "@/components/product/ProductThumbnail";
+import { ProductBadges } from "@/components/product/ProductBadges";
+import { ProductPreview } from "@/components/product/ProductPreview";
 import { Icon } from "@/components/ui/Icon";
 import { getCategoryBySlug } from "@/data/categories";
 import { formatPrice } from "@/lib/catalog";
@@ -8,39 +9,51 @@ import styles from "./ProductCard.module.css";
 
 interface ProductCardProps {
   product: Product;
+  /** Hide the Featured badge where every item is featured anyway. */
+  showFeaturedBadge?: boolean;
 }
 
-/** Reusable product card, rendered from catalog data. */
-export function ProductCard({ product }: ProductCardProps) {
+const CARD_IMAGE_SIZES =
+  "(min-width: 1120px) 352px, (min-width: 640px) 33vw, 100vw";
+
+/**
+ * Reusable product card, rendered from catalog data.
+ * The title link is stretched over the whole card, so the card is fully
+ * clickable while screen readers get one clear link named after the product.
+ */
+export function ProductCard({
+  product,
+  showFeaturedBadge = true,
+}: ProductCardProps) {
   const category = getCategoryBySlug(product.category);
 
   return (
     <article className={styles.card}>
-      <Link
-        href={`/products/${product.slug}`}
-        className={styles.link}
-        aria-label={`View ${product.title} — ${formatPrice(product.price)}`}
-      >
-        <ProductThumbnail
-          icon={category?.icon ?? "templates"}
-          label={category?.name ?? "Product"}
+      <div className={styles.media}>
+        <ProductPreview product={product} sizes={CARD_IMAGE_SIZES} />
+        <ProductBadges
+          isFeatured={product.isFeatured}
+          isNew={product.isNew}
+          showFeatured={showFeaturedBadge}
+          className={styles.badges}
         />
-        <div className={styles.body}>
-          <div className={styles.metaRow}>
-            <span className={styles.category}>{category?.name}</span>
-            {product.isNew ? <span className={styles.newBadge}>New</span> : null}
-          </div>
-          <h3 className={styles.title}>{product.title}</h3>
-          <p className={styles.description}>{product.description}</p>
-          <div className={styles.footer}>
-            <span className={styles.price}>{formatPrice(product.price)}</span>
-            <span className={styles.viewHint}>
-              View details
-              <Icon name="arrow-right" size={15} />
-            </span>
-          </div>
+      </div>
+      <div className={styles.body}>
+        <p className={styles.category}>{category?.name}</p>
+        <h3 className={styles.title}>
+          <Link href={`/products/${product.slug}`} className={styles.link}>
+            {product.title}
+          </Link>
+        </h3>
+        <p className={styles.description}>{product.description}</p>
+        <div className={styles.footer}>
+          <span className={styles.price}>{formatPrice(product.price)}</span>
+          <span className={styles.viewHint} aria-hidden="true">
+            View details
+            <Icon name="arrow-right" size={15} />
+          </span>
         </div>
-      </Link>
+      </div>
     </article>
   );
 }

@@ -1,0 +1,17 @@
+.section {
+  margin-top: clamp(3rem, 7vw, 5rem);
+  padding-top: clamp(2rem, 5vw, 3rem);
+  border-top: 1px solid var(--border);
+}
+
+.grid {
+  display: grid;
+  gap: clamp(1rem, 2.5vw, 1.5rem);
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 285px), 1fr));
+  align-items: stretch;
+  list-style: none;
+}
+
+.item {
+  min-width: 0;
+}

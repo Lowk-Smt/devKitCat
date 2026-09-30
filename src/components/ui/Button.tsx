@@ -15,6 +15,9 @@ interface ButtonProps {
   type?: "button" | "submit";
   className?: string;
   ariaLabel?: string;
+  fullWidth?: boolean;
+  disabled?: boolean;
+  onClick?: () => void;
 }
 
 /**
@@ -29,24 +32,39 @@ export function Button({
   type = "button",
   className,
   ariaLabel,
+  fullWidth = false,
+  disabled = false,
+  onClick,
 }: ButtonProps) {
   const classes = cx(
     styles.button,
     styles[variant],
     styles[size],
+    fullWidth && styles.fullWidth,
     className,
   );
 
   if (href) {
     return (
-      <Link href={href} className={classes} aria-label={ariaLabel}>
+      <Link
+        href={href}
+        className={classes}
+        aria-label={ariaLabel}
+        onClick={onClick}
+      >
         {children}
       </Link>
     );
   }
 
   return (
-    <button type={type} className={classes} aria-label={ariaLabel}>
+    <button
+      type={type}
+      className={classes}
+      aria-label={ariaLabel}
+      disabled={disabled}
+      onClick={onClick}
+    >
       {children}
     </button>
   );

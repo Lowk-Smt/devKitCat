@@ -8,16 +8,23 @@ tools, templates, and complete starter kits.
 
 ## Status
 
-This repository is at **PR #1 — foundation only**:
+This repository is at **PR #2 — marketplace browsing experience**:
 
-- Brand, design system, and responsive public shell (header, footer)
-- Polished homepage (hero, categories, featured products, value props, CTA)
-- Catalog routes: `/products` and `/products/:slug`
-- Local mock product/category data with future-friendly types
+- `/products` is a full marketplace: search, category filter, sorting (Featured,
+  Newest, price low→high / high→low), result count, and empty / no-results
+  states. Filters combine and live in the URL (`?q=&category=&sort=`).
+- Polished product cards with Featured / New badges.
+- Product detail pages with a gallery, purchase CTAs, and Overview, Features,
+  Requirements, What's included, Installation, Documentation, Changelog and
+  License sections, plus related products.
+- A reusable, media-agnostic product gallery (`GalleryItem` list → stage +
+  thumbnails).
+- A client-side **cart UI** (header button + drawer, persisted in
+  `localStorage`). It is UI only — there is no checkout.
 
-Not yet implemented (left for future PRs): backend persistence, search,
-authentication, payments/checkout, admin tooling, secure downloads, real
-product imagery, and documentation pages.
+Not yet implemented (left for future PRs): backend persistence, authentication,
+payments/checkout, admin tooling, secure downloads, 3D viewer, real product
+imagery, reviews, and online documentation pages.
 
 ## Tech stack
 
@@ -51,7 +58,7 @@ Open [http://localhost:3000](http://localhost:3000).
 | Route              | Description                                        |
 | ------------------ | -------------------------------------------------- |
 | `/`                | Homepage                                           |
-| `/products`        | Product catalog (optional `?category=` filtering)  |
+| `/products`        | Marketplace (`?q=`, `?category=`, `?sort=` — all optional, combinable) |
 | `/products/:slug`  | Product detail (static params from mock data, 404 for unknown slugs) |
 
 ## Project structure
@@ -64,22 +71,30 @@ src/
 │   ├── layout.tsx        # Shell: header, main, footer
 │   └── page.tsx          # Homepage composition
 ├── components/
+│   ├── cart/             # CartProvider, drawer, header button (UI only)
 │   ├── category/         # CategoryCard
 │   ├── layout/           # Header, Footer, Logo
-│   ├── product/          # ProductCard, ProductThumbnail
+│   ├── marketplace/      # ProductBrowser, search, sort, category filter
+│   ├── product/          # ProductCard, badges, image, gallery/, detail/
 │   ├── sections/         # Homepage sections
-│   └── ui/               # Button, SectionHeading, Icon
+│   └── ui/               # Button, SectionHeading, Icon, EmptyState
 ├── data/                 # Mock categories & products (static)
-├── lib/                  # Small helpers (formatting, class names)
+├── lib/                  # Catalog search/sort, gallery items, cart store, helpers
 └── types/                # Shared catalog types
 ```
 
 ## Data
 
 All catalog content lives in `src/data` as static mock data. The `Product`
-type in `src/types` is intentionally future-friendly (`images`, `changelog`,
-`includedFiles`, `requirements`, `license`, …) so later PRs can extend it
-without rewriting the foundation.
+type in `src/types` covers everything the UI renders (`images`, `overview`,
+`features`, `requirements`, `includedFiles`, `installation`, `documentation`,
+`changelog`, `license`, `releasedAt`, `isFeatured`, `isNew`, …), so pages are
+driven by data rather than per-page markup. Search, filtering, and sorting are
+pure functions in `src/lib/catalog.ts`.
+
+Products with an empty `images` array use the placeholder artwork. To add real
+images later, list paths in `images` — cards use the first one and the gallery
+shows all of them.
 
 ## License
 

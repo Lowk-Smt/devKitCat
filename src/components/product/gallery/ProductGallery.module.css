@@ -1,0 +1,15 @@
+.gallery {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.thumbs {
+  display: flex;
+  gap: 0.6rem;
+  padding: 4px;
+  margin: -4px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}

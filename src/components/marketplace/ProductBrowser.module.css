@@ -1,0 +1,67 @@
+.controls {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding-bottom: 1.25rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  margin-block: 1.25rem;
+  min-height: 1.75rem;
+}
+
+.count {
+  color: var(--text-muted);
+  font-size: 0.925rem;
+  overflow-wrap: anywhere;
+}
+
+.count strong {
+  color: var(--text);
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+.clear {
+  padding: 0.25rem 0.1rem;
+  color: var(--accent-strong);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.clear:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.grid {
+  display: grid;
+  gap: clamp(1rem, 2.5vw, 1.5rem);
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 285px), 1fr));
+  align-items: stretch;
+  list-style: none;
+}
+
+.gridItem {
+  min-width: 0;
+}
+
+@media (min-width: 640px) {
+  .toolbar {
+    flex-direction: row;
+    align-items: center;
+    gap: 1rem;
+  }
+}

@@ -33,7 +33,11 @@ export function FeaturedProductsSection({
         />
         <div className="card-grid">
           {products.map((product) => (
-            <ProductCard key={product.id} product={product} />
+            <ProductCard
+              key={product.id}
+              product={product}
+              showFeaturedBadge={false}
+            />
           ))}
         </div>
       </div>
