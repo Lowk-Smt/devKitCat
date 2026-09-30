@@ -66,6 +66,7 @@ export function ProductBrowser({ products }: ProductBrowserProps) {
         />
       </div>
 
+      <h2 className="sr-only">Product results</h2>
       <div className={styles.summary}>
         <p className={styles.count} role="status">
           <strong>{results.length}</strong>{" "}

@@ -59,8 +59,11 @@ function Chip({ label, count, active, onClick }: ChipProps) {
       onClick={onClick}
     >
       {label}
-      <span className={styles.count} aria-label={`${count} products`}>
+      <span className={styles.count} aria-hidden="true">
         {count}
+      </span>
+      <span className="sr-only">
+        {count} {count === 1 ? "product" : "products"}
       </span>
     </button>
   );

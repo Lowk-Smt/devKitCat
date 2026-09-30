@@ -54,7 +54,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
   return (
     <div className={styles.page}>
       <div className="container">
-        <nav aria-label="Breadcrumb" className={styles.breadcrumb}>
+        <nav aria-label="Breadcrumb">
           <ol className={styles.breadcrumbList}>
             <li>
               <Link href="/products" className={styles.crumbLink}>

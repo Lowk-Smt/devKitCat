@@ -22,7 +22,8 @@
   min-width: 0;
 }
 
-.breadcrumbList li + li::before {
+/* Separator trails each item, so a wrapped line never starts with "/". */
+.breadcrumbList li:not(:last-child)::after {
   content: "/";
   color: var(--text-faint);
 }

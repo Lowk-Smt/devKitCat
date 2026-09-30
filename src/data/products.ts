@@ -349,10 +349,6 @@ export function getFeaturedProducts(): MockProduct[] {
   return products.filter((product) => product.isFeatured);
 }
 
-export function getProductsByCategory(slug: string): MockProduct[] {
-  return products.filter((product) => product.category === slug);
-}
-
 export function getProductBySlug(slug: string): MockProduct | undefined {
   return products.find((product) => product.slug === slug);
 }
