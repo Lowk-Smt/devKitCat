@@ -8,8 +8,8 @@ interface SectionHeadingProps {
   description?: string;
   /** Optional action rendered on the right (e.g. a "view all" link). */
   action?: ReactNode;
-  /** Heading level: sections use h2 by default. */
-  level?: 2 | 3;
+  /** Heading level: sections use h2 by default; page titles use h1. */
+  level?: 1 | 2 | 3;
   id?: string;
 }
 
@@ -21,7 +21,7 @@ export function SectionHeading({
   level = 2,
   id,
 }: SectionHeadingProps) {
-  const Title = level === 2 ? "h2" : "h3";
+  const Title = `h${level}` as const;
 
   return (
     <div className={styles.heading}>

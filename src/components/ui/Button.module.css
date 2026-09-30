@@ -39,7 +39,7 @@
 /* Variants ---------------------------------------------------------- */
 
 .primary {
-  background: linear-gradient(180deg, #6a88fa 0%, #5576f2 100%);
+  background: linear-gradient(180deg, #4f6fee 0%, #4260e4 100%);
   color: var(--accent-contrast);
   border: 1px solid rgba(255, 255, 255, 0.12);
   box-shadow:
@@ -48,7 +48,7 @@
 }
 
 .primary:hover {
-  background: linear-gradient(180deg, #7692fb 0%, #5f7ff4 100%);
+  background: linear-gradient(180deg, #5675f0 0%, #4968e8 100%);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.16),
     0 14px 28px -14px rgba(93, 125, 249, 0.9);
@@ -63,4 +63,23 @@
 .secondary:hover {
   background: var(--surface-hover);
   border-color: rgba(148, 163, 184, 0.4);
+}
+
+.fullWidth {
+  width: 100%;
+}
+
+.button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+  box-shadow: none;
+}
+
+.button:disabled:hover {
+  background: var(--surface);
+  border-color: var(--border-strong);
+}
+
+.primary:disabled:hover {
+  background: linear-gradient(180deg, #4f6fee 0%, #4260e4 100%);
 }

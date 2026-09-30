@@ -110,6 +110,27 @@ const ICONS: Record<IconName, React.ReactNode> = {
       <path d="M18 6 6 18" />
     </>
   ),
+  cart: (
+    <>
+      <path d="M3 4h2.2l2 11.2a1.5 1.5 0 0 0 1.5 1.3h8.6a1.5 1.5 0 0 0 1.5-1.1L20.5 8H6" />
+      <circle cx="9.5" cy="20" r="1.2" />
+      <circle cx="17" cy="20" r="1.2" />
+    </>
+  ),
+  search: (
+    <>
+      <circle cx="11" cy="11" r="6.5" />
+      <path d="m20 20-4.2-4.2" />
+    </>
+  ),
+  check: <path d="m5 12.5 4.5 4.5L19 7.5" />,
+  trash: (
+    <>
+      <path d="M4 7h16" />
+      <path d="M9 7V4.5h6V7" />
+      <path d="m6 7 1 13h10l1-13" />
+    </>
+  ),
 };
 
 /**

@@ -18,7 +18,7 @@
   /* Text */
   --text: #e9ecf4;
   --text-muted: #a3acc1;
-  --text-faint: #737d94;
+  --text-faint: #8590a8;
 
   /* Accent — restrained indigo */
   --accent: #5d7df9;
@@ -26,6 +26,9 @@
   --accent-contrast: #ffffff;
   --accent-soft: rgba(93, 125, 249, 0.14);
   --accent-faint: rgba(93, 125, 249, 0.08);
+
+  /* Status — used sparingly (e.g. "New" badge, success states) */
+  --positive: #5fd0a2;
 
   /* Radii */
   --radius-sm: 8px;
@@ -72,6 +75,11 @@ html {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* Lock page scroll while a modal dialog (e.g. the cart) is open. */
+body:has(dialog[open]) {
+  overflow: hidden;
 }
 
 body {
@@ -182,4 +190,16 @@ button {
 
 .skip-link:focus-visible {
   transform: translateY(0);
+}
+
+/* Visually hidden, but still announced by assistive tech. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }

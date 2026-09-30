@@ -1,33 +1,39 @@
 .card {
-  height: 100%;
-}
-
-.link {
+  position: relative;
   display: flex;
   flex-direction: column;
   height: 100%;
+  min-width: 0;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   overflow: hidden;
-  color: var(--text);
   transition:
     border-color 0.18s ease,
     background-color 0.18s ease,
-    transform 0.18s ease,
     box-shadow 0.18s ease;
 }
 
-.link:hover {
-  text-decoration: none;
+.card:hover {
   border-color: rgba(93, 125, 249, 0.45);
   background: var(--surface-hover);
-  transform: translateY(-3px);
-  box-shadow: 0 18px 36px -24px rgba(0, 0, 0, 0.9);
+  box-shadow: 0 18px 36px -26px rgba(0, 0, 0, 0.9);
 }
 
-.link:focus-visible {
+/* The stretched link owns keyboard focus, so show the ring on the card. */
+.card:has(.link:focus-visible) {
+  outline: 2px solid var(--accent-strong);
   outline-offset: 3px;
+}
+
+.media {
+  position: relative;
+}
+
+.badges {
+  position: absolute;
+  top: 0.7rem;
+  left: 0.7rem;
 }
 
 .body {
@@ -36,13 +42,6 @@
   flex: 1;
   gap: 0.55rem;
   padding: 1.15rem 1.2rem 1.25rem;
-}
-
-.metaRow {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
 }
 
 .category {
@@ -54,22 +53,33 @@
   color: var(--text-faint);
 }
 
-.newBadge {
-  font-family: var(--font-mono);
-  font-size: 0.65rem;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--accent-strong);
-  background: var(--accent-soft);
-  border: 1px solid rgba(93, 125, 249, 0.35);
-  border-radius: 999px;
-  padding: 0.15rem 0.55rem;
-}
-
 .title {
   font-size: 1.08rem;
   letter-spacing: -0.015em;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.link {
+  color: var(--text);
+}
+
+.link:hover {
+  text-decoration: none;
+}
+
+/* Stretch the link's hit area over the whole card. */
+.link::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+
+.link:focus-visible {
+  outline: none;
 }
 
 .description {
@@ -106,9 +116,12 @@
   color: var(--text-faint);
   font-size: 0.85rem;
   font-weight: 500;
-  transition: color 0.15s ease;
+  transition:
+    color 0.15s ease,
+    transform 0.15s ease;
 }
 
-.link:hover .viewHint {
+.card:hover .viewHint {
   color: var(--accent-strong);
+  transform: translateX(2px);
 }

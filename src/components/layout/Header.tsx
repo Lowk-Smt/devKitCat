@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import { CartButton } from "@/components/cart/CartButton";
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import { Logo } from "@/components/layout/Logo";
@@ -73,6 +74,7 @@ export function Header() {
           <Button href="/products" size="sm" className={styles.headerCta}>
             Browse Products
           </Button>
+          <CartButton />
           <button
             type="button"
             className={styles.menuButton}

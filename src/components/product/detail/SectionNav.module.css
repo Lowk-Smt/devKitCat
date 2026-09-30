@@ -1,0 +1,82 @@
+.heading {
+  display: none;
+  margin-bottom: 0.75rem;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+/* Phones / tablets: a horizontally scrolling row of links. */
+.list {
+  display: flex;
+  gap: 0.5rem;
+  padding: 4px;
+  margin: -4px;
+  list-style: none;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.list::-webkit-scrollbar {
+  display: none;
+}
+
+.link {
+  display: block;
+  padding: 0.4rem 0.85rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  font-weight: 500;
+  white-space: nowrap;
+  transition:
+    color 0.15s ease,
+    border-color 0.15s ease,
+    background-color 0.15s ease;
+}
+
+.link:hover {
+  color: var(--text);
+  border-color: var(--border-strong);
+  background: var(--surface-hover);
+}
+
+/* Desktop: a sticky vertical list beside the content. */
+@media (min-width: 960px) {
+  .nav {
+    position: sticky;
+    top: 5.5rem;
+  }
+
+  .heading {
+    display: block;
+  }
+
+  .list {
+    flex-direction: column;
+    gap: 0.15rem;
+    padding: 0;
+    margin: 0;
+    overflow: visible;
+    border-left: 1px solid var(--border);
+  }
+
+  .link {
+    padding: 0.4rem 0.9rem;
+    margin-left: -1px;
+    border: none;
+    border-left: 1px solid transparent;
+    border-radius: 0;
+    background: none;
+  }
+
+  .link:hover {
+    background: none;
+    border-left-color: var(--accent-strong);
+  }
+}

@@ -6,6 +6,8 @@ interface ProductThumbnailProps {
   icon: IconName;
   label: string;
   className?: string;
+  /** Hide from assistive tech when the surrounding UI already names the product. */
+  decorative?: boolean;
 }
 
 /**
@@ -16,17 +18,21 @@ export function ProductThumbnail({
   icon,
   label,
   className,
+  decorative = false,
 }: ProductThumbnailProps) {
   return (
     <div
-      className={className ? `${styles.thumbnail} ${className}` : styles.thumbnail}
-      role="img"
-      aria-label={`${label} artwork placeholder`}
+      className={
+        className ? `${styles.thumbnail} ${className}` : styles.thumbnail
+      }
+      {...(decorative
+        ? { "aria-hidden": true }
+        : { role: "img", "aria-label": `${label} artwork placeholder` })}
     >
       <span className={styles.iconWrap}>
         <Icon name={icon} size={30} />
       </span>
-      <span className={styles.label}>{label}</span>
+      {decorative ? null : <span className={styles.label}>{label}</span>}
     </div>
   );
 }
