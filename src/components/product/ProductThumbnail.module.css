@@ -1,0 +1,53 @@
+.thumbnail {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 16 / 10;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background:
+    radial-gradient(
+      120% 90% at 50% 0%,
+      rgba(93, 125, 249, 0.16) 0%,
+      transparent 60%
+    ),
+    linear-gradient(160deg, #171c28 0%, #10131b 100%);
+  border: 1px solid var(--border);
+}
+
+/* Subtle grid texture. */
+.thumbnail::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+  background-size: 28px 28px;
+  mask-image: radial-gradient(ellipse at center, black 30%, transparent 80%);
+}
+
+.iconWrap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  border: 1px solid rgba(93, 125, 249, 0.3);
+  color: var(--accent-strong);
+}
+
+.label {
+  position: absolute;
+  left: 0.85rem;
+  bottom: 0.7rem;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}

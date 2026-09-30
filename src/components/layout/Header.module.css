@@ -1,0 +1,177 @@
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: rgba(10, 12, 17, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+}
+
+.inner {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  height: 4rem;
+}
+
+/* Brand -------------------------------------------------------------- */
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  color: var(--text);
+  margin-right: auto;
+}
+
+.brand:hover {
+  text-decoration: none;
+}
+
+.wordmark {
+  font-size: 1.1rem;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+
+/* Desktop navigation -------------------------------------------------- */
+
+.desktopNav {
+  display: none;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.navLink {
+  padding: 0.45rem 0.8rem;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-size: 0.925rem;
+  font-weight: 500;
+  transition:
+    color 0.15s ease,
+    background-color 0.15s ease;
+}
+
+.navLink:hover {
+  color: var(--text);
+  text-decoration: none;
+  background: var(--accent-faint);
+}
+
+.navLinkActive {
+  color: var(--text);
+  background: var(--accent-faint);
+}
+
+.navPlaceholder {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.45rem 0.8rem;
+  color: var(--text-faint);
+  font-size: 0.925rem;
+  font-weight: 500;
+}
+
+.soonChip {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 999px;
+  padding: 0.1rem 0.45rem;
+}
+
+/* Actions -------------------------------------------------------------- */
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.headerCta {
+  display: none;
+}
+
+.menuButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-muted);
+  transition:
+    color 0.15s ease,
+    border-color 0.15s ease,
+    background-color 0.15s ease;
+}
+
+.menuButton:hover {
+  color: var(--text);
+  border-color: var(--border-strong);
+  background: var(--surface-hover);
+}
+
+/* Mobile navigation ------------------------------------------------------ */
+
+.mobileNav {
+  border-top: 1px solid var(--border);
+  background: var(--bg-raise);
+  padding-block: 0.75rem 1.25rem;
+}
+
+.mobileNavInner {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.mobileNavLink {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 0.5rem;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-size: 1rem;
+  font-weight: 500;
+}
+
+.mobileNavLink:hover {
+  color: var(--text);
+  text-decoration: none;
+}
+
+.mobileMenuCta {
+  margin-top: 0.75rem;
+}
+
+/* Breakpoints ------------------------------------------------------------ */
+
+@media (min-width: 860px) {
+  .desktopNav {
+    display: flex;
+  }
+
+  .headerCta {
+    display: inline-flex;
+  }
+
+  .menuButton {
+    display: none;
+  }
+
+  .mobileNav {
+    display: none;
+  }
+}
