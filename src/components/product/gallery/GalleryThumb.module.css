@@ -33,9 +33,17 @@
   border-radius: 0;
 }
 
-.icon {
+.icon,
+.model {
   display: flex;
   align-items: center;
   justify-content: center;
   color: var(--accent-strong);
+}
+
+.model {
+  gap: 0.35rem;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 600;
 }

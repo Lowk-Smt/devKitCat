@@ -1,0 +1,272 @@
+.viewer {
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+  padding: 0.7rem 0.9rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.heading {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.heading svg {
+  color: var(--accent-strong);
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.15rem 0.45rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.viewer[data-status="ready"] .badge {
+  color: var(--positive);
+}
+
+.viewport {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  aspect-ratio: 16 / 10;
+  background:
+    radial-gradient(
+      ellipse at 50% 30%,
+      rgba(93, 125, 249, 0.09),
+      transparent 70%
+    ),
+    linear-gradient(160deg, #171c28, #10131b);
+}
+
+.canvasMount {
+  position: absolute;
+  inset: 0;
+}
+
+.canvasMount canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+}
+
+/* Keep keyboard focus inside the clipped canvas edge. */
+.canvasMount canvas:focus-visible {
+  outline-offset: -3px;
+}
+
+.viewer:not([data-status="ready"]) .canvasMount {
+  visibility: hidden;
+}
+
+.message {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.65rem;
+  padding: clamp(0.9rem, 3vw, 1.5rem);
+  text-align: center;
+}
+
+.messageIcon {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  color: var(--text-muted);
+  background: var(--surface);
+}
+
+.loader {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  border: 2px solid var(--border-strong);
+  border-top-color: var(--accent-strong);
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+}
+
+.messageTitle {
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.messageText {
+  max-width: 30ch;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.retry {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-height: 44px;
+  padding: 0.5rem 0.8rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.retry:hover {
+  background: var(--surface-hover);
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.65rem;
+  border-top: 1px solid var(--border);
+}
+
+.navigationControls,
+.viewControls,
+.controlGroup {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.navigationControls {
+  gap: 0.65rem;
+}
+
+.iconButton,
+.textButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-height: 44px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-raise);
+  font-size: 0.75rem;
+  font-weight: 500;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.iconButton {
+  width: 44px;
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+.textButton {
+  padding: 0.5rem 0.65rem;
+}
+
+.iconButton:hover:not(:disabled),
+.textButton:hover:not(:disabled) {
+  color: var(--text);
+  background: var(--surface-hover);
+  border-color: var(--border-strong);
+}
+
+.textButton[aria-pressed="true"] {
+  border-color: var(--accent-strong);
+  background: var(--accent-soft);
+}
+
+.iconButton:disabled,
+.textButton:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.toggleState {
+  min-width: 2em;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  text-transform: uppercase;
+}
+
+.hint {
+  padding: 0 0.75rem 0.7rem;
+  color: var(--text-faint);
+  font-size: 0.7rem;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.description {
+  margin-top: 0.6rem;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 480px) {
+  .viewport {
+    aspect-ratio: 4 / 3;
+    /* Room for a complete error message and retry at 320px, too. */
+    min-height: 240px;
+  }
+
+  .toolbar {
+    justify-content: center;
+  }
+
+  .navigationControls,
+  .viewControls {
+    justify-content: center;
+    width: 100%;
+  }
+
+  .viewControls .textButton {
+    flex: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loader {
+    animation: none;
+  }
+}

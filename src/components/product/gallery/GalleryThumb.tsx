@@ -29,6 +29,13 @@ function ThumbContent({ item }: { item: GalleryItem }) {
           }
         />
       );
+    case "model":
+      return (
+        <span className={styles.model}>
+          <Icon name="3d-assets" size={20} />
+          <span>3D</span>
+        </span>
+      );
     case "placeholder":
       return (
         <span className={styles.icon}>
@@ -51,7 +58,7 @@ export function GalleryThumb({
       type="button"
       className={cx(styles.thumb, selected && styles.selected)}
       aria-pressed={selected}
-      aria-label={`${item.label}, ${position} of ${total}`}
+      aria-label={`${item.label}${item.kind === "model" ? ", interactive 3D" : ""}, ${position} of ${total}`}
       onClick={onSelect}
     >
       <ThumbContent item={item} />
