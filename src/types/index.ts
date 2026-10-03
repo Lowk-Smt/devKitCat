@@ -30,7 +30,17 @@ export type IconName =
   | "rotate-right"
   | "zoom-in"
   | "zoom-out"
-  | "wireframe";
+  | "wireframe"
+  | "home"
+  | "receipt"
+  | "download"
+  | "settings"
+  | "user"
+  | "calendar"
+  | "info"
+  | "eye"
+  | "eye-off"
+  | "arrow-up-right";
 
 /** Deliverable format of a product. */
 export type ProductType =

@@ -8,7 +8,9 @@ tools, templates, and complete starter kits.
 
 ## Status
 
-This repository is at **PR #3 — interactive 3D product previews**:
+This repository includes the merged foundation (PR #1), marketplace experience
+(PR #2), and interactive 3D previews (PR #3). Current work is **PR #4 — customer
+account frontend**:
 
 - `/products` is a full marketplace: search, category filter, sorting (Featured,
   Newest, price low→high / high→low), result count, and empty / no-results
@@ -24,10 +26,13 @@ This repository is at **PR #3 — interactive 3D product previews**:
   local sample models demonstrate both supported formats.
 - A client-side **cart UI** (header button + drawer, persisted in
   `localStorage`). It is UI only — there is no checkout.
+- Customer account screens: overview, purchases, order details, downloads,
+  settings, login, and registration. They use centralized mock data and clearly
+  labeled frontend-only states; forms do not send or store credentials.
 
-Not yet implemented (left for future PRs): backend persistence, authentication,
-payments/checkout, admin tooling, secure downloads, real production product
-imagery, reviews, and online documentation pages.
+Not yet implemented (left for future PRs): backend persistence, real
+authentication, payments/checkout, admin tooling, secure downloads, real
+production product imagery, reviews, and online documentation pages.
 
 ## Tech stack
 
@@ -56,7 +61,7 @@ Open [http://localhost:3000](http://localhost:3000).
 | `npm run start`     | Serve the production build               |
 | `npm run lint`      | Run ESLint                               |
 | `npm run typecheck` | Run TypeScript checks without emitting   |
-| `npm test`          | Gallery, source validation, framing, resource cleanup and demo-asset tests (Node 22.17+) |
+| `npm test`          | Account-state and form-safety helpers, gallery, source validation, framing, cleanup and demo-asset tests (Node 22.17+) |
 
 ## Routes
 
@@ -65,6 +70,13 @@ Open [http://localhost:3000](http://localhost:3000).
 | `/`                | Homepage                                           |
 | `/products`        | Marketplace (`?q=`, `?category=`, `?sort=` — all optional, combinable) |
 | `/products/:slug`  | Product detail (static params from mock data, 404 for unknown slugs) |
+| `/login`            | Sign-in UI preview; no authentication or credential handling |
+| `/register`         | Registration UI preview; no account creation |
+| `/account`          | Demo customer overview |
+| `/account/purchases` | Demo order history and search |
+| `/account/purchases/:id` | Demo order details (404 for unknown IDs) |
+| `/account/downloads` | Demo library; download controls are disabled placeholders |
+| `/account/settings` | Presentational profile and preference controls |
 
 ## Project structure
 
@@ -72,10 +84,14 @@ Open [http://localhost:3000](http://localhost:3000).
 src/
 ├── app/                  # Routes, layout, global styles
 │   ├── products/         # Catalog + product detail routes
+│   ├── account/          # Customer overview, purchases, downloads, settings
+│   ├── login/            # Frontend-only sign-in screen
+│   ├── register/         # Frontend-only registration screen
 │   ├── globals.css       # Design tokens & layout primitives
 │   ├── layout.tsx        # Shell: header, main, footer
 │   └── page.tsx          # Homepage composition
 ├── components/
+│   ├── account/          # Customer shell, navigation, cards, forms and states
 │   ├── cart/             # CartProvider, drawer, header button (UI only)
 │   ├── category/         # CategoryCard
 │   ├── layout/           # Header, Footer, Logo
@@ -83,8 +99,8 @@ src/
 │   ├── product/          # ProductCard, badges, image, gallery/, detail/, viewer/
 │   ├── sections/         # Homepage sections
 │   └── ui/               # Button, SectionHeading, Icon, EmptyState
-├── data/                 # Mock categories & products (static)
-├── lib/                  # Catalog search/sort, gallery items, cart store, helpers
+├── data/                 # Mock categories, products, and customer/order fixtures
+├── lib/                  # Catalog search/sort, account view states, cart store, helpers
 └── types/                # Shared catalog types
 ```
 
@@ -100,6 +116,26 @@ pure functions in `src/lib/catalog.ts`.
 Cards still use the first `images` entry, or the original placeholder artwork.
 Detail galleries show `modelPreviews` first, then `images`, with a placeholder
 when both are empty. Non-3D products do not need any new fields.
+
+## Customer account frontend (PR #4)
+
+The customer routes are an integrated **frontend-only preview**. The fixed demo
+identity, order records, and product-ID download entries live together in
+`src/data/mock-account.ts`; catalog product names, categories, versions, and file
+counts are resolved from the existing `src/data/products.ts` data. The account
+presentation fixture is centralized and deliberately has no login/logout logic,
+client storage, sessions, or access control.
+
+`/login` and `/register` are visual states only. Their forms use browser/client
+validation and explicitly discard the entered values; they do not transmit or
+store passwords or create accounts. Settings are presentational and are not
+persisted. Download buttons are disabled and do not point to a file or endpoint.
+
+Authentication, backend persistence, payment processing, and secure downloads
+are intentionally deferred. To inspect collection UI states without a service,
+append `?preview=empty`, `?preview=loading`, or `?preview=error` to
+`/account/purchases` or `/account/downloads`; the default state is populated.
+These are fixed visual examples, not simulated requests.
 
 ## 3D previews
 

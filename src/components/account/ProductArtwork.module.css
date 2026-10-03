@@ -1,0 +1,46 @@
+.artwork {
+  flex: 0 0 auto;
+  overflow: hidden;
+  border-radius: 10px;
+}
+
+.sm {
+  width: 3.5rem;
+}
+
+.md {
+  width: 5.25rem;
+}
+
+.artwork > div,
+.artwork > div > div {
+  width: 100%;
+}
+
+.artwork img {
+  object-fit: cover;
+}
+
+.fallback {
+  width: 100%;
+  border-radius: 10px;
+}
+
+.fallback::before {
+  background-size: 18px 18px;
+}
+
+.fallback span {
+  display: none;
+}
+
+.fallback > span:first-child {
+  display: inline-flex;
+  width: 2rem;
+  height: 2rem;
+}
+
+.fallback svg {
+  width: 18px;
+  height: 18px;
+}

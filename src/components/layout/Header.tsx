@@ -13,6 +13,7 @@ import styles from "./Header.module.css";
 const NAV_LINKS = [
   { href: "/products", label: "Products" },
   { href: "/#categories", label: "Categories" },
+  { href: "/account", label: "Account" },
 ] as const;
 
 export function Header() {
@@ -33,6 +34,7 @@ export function Header() {
 
   function isActive(href: string): boolean {
     if (href === "/products") return pathname.startsWith("/products");
+    if (href === "/account") return pathname.startsWith("/account");
     if (href === "/#categories") return false;
     return pathname === href;
   }
