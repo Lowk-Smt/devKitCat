@@ -1,4 +1,4 @@
-/* Shared footprint so the gallery never shifts between media kinds. */
+/* Media share the same responsive width; the 3D stage also holds controls. */
 .stage {
   width: 100%;
 }

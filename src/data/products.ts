@@ -204,7 +204,15 @@ export const products: MockProduct[] = [
     ],
     category: "3d-assets",
     price: 7.99,
-    images: [],
+    images: ["/previews/cozy-lounge.png"],
+    modelPreviews: [
+      {
+        src: "/previews/cozy-lounge.glb",
+        label: "Lounge chair",
+        description:
+          "Sample asset: a warm terracotta lounge chair with a linen pillow and wooden legs. This demo illustrates the preview, not the full pack.",
+      },
+    ],
     type: "model-pack",
     version: "1.0.3",
     features: [
@@ -251,6 +259,14 @@ export const products: MockProduct[] = [
     category: "3d-assets",
     price: 6.99,
     images: [],
+    modelPreviews: [
+      {
+        src: "/previews/camping-lantern.gltf",
+        label: "Camping lantern",
+        description:
+          "Sample asset: a moss-green camping lantern with a brass handle and a warm emissive light. This demo illustrates the preview, not the full pack.",
+      },
+    ],
     type: "model-pack",
     version: "1.1.0",
     features: [

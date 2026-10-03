@@ -1,11 +1,10 @@
 import type { IconName, Product } from "@/types";
 
 /**
- * One entry in a product gallery. The gallery renders a list of these, so new
- * media types (e.g. an interactive 3D model) can be added as another `kind`
- * without changing the gallery's selection, thumbnail, or layout logic.
+ * One entry in a product gallery. New media types plug into the stage and
+ * thumbnail renderers without changing selection or the product page.
  */
-export type GalleryItem = GalleryImage | GalleryPlaceholder;
+export type GalleryItem = GalleryImage | GalleryModel | GalleryPlaceholder;
 
 interface GalleryItemBase {
   id: string;
@@ -17,6 +16,13 @@ export interface GalleryImage extends GalleryItemBase {
   kind: "image";
   src: string;
   alt: string;
+}
+
+export interface GalleryModel extends GalleryItemBase {
+  kind: "model";
+  src: string;
+  title: string;
+  description: string;
 }
 
 /** Stand-in artwork for products that don't have real imagery yet. */
@@ -31,28 +37,38 @@ interface GalleryContext {
   icon: IconName;
 }
 
-/** Builds gallery items from a product: its images, or one placeholder. */
+/** Model previews first, then images; keep the original empty-gallery fallback. */
 export function buildGalleryItems(
-  product: Pick<Product, "id" | "title" | "images">,
+  product: Pick<Product, "id" | "title" | "images" | "modelPreviews">,
   { categoryName, icon }: GalleryContext,
 ): GalleryItem[] {
-  if (product.images.length === 0) {
-    return [
-      {
-        id: `${product.id}-placeholder`,
-        kind: "placeholder",
-        label: "Preview",
-        icon,
-        categoryName,
-      },
-    ];
-  }
+  const items: GalleryItem[] = [
+    ...(product.modelPreviews ?? []).map((preview, index): GalleryModel => ({
+      id: `${product.id}-model-${index}`,
+      kind: "model",
+      label: preview.label,
+      src: preview.src,
+      title: `${product.title} — ${preview.label}`,
+      description: preview.description,
+    })),
+    ...product.images.map((src, index): GalleryImage => ({
+      id: `${product.id}-image-${index}`,
+      kind: "image",
+      label: `Image ${index + 1}`,
+      src,
+      alt: `${product.title} — preview ${index + 1} of ${product.images.length}`,
+    })),
+  ];
 
-  return product.images.map((src, index) => ({
-    id: `${product.id}-image-${index}`,
-    kind: "image",
-    label: `Image ${index + 1}`,
-    src,
-    alt: `${product.title} — preview ${index + 1} of ${product.images.length}`,
-  }));
+  return items.length > 0
+    ? items
+    : [
+        {
+          id: `${product.id}-placeholder`,
+          kind: "placeholder",
+          label: "Preview",
+          icon,
+          categoryName,
+        },
+      ];
 }

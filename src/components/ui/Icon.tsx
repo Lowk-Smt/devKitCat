@@ -131,6 +131,36 @@ const ICONS: Record<IconName, React.ReactNode> = {
       <path d="m6 7 1 13h10l1-13" />
     </>
   ),
+  "rotate-left": (
+    <>
+      <path d="M4 10a8 8 0 1 1 1.8 8" />
+      <path d="M4 4v6h6" />
+    </>
+  ),
+  "rotate-right": (
+    <>
+      <path d="M20 10a8 8 0 1 0-1.8 8" />
+      <path d="M20 4v6h-6" />
+    </>
+  ),
+  "zoom-in": (
+    <>
+      <circle cx="10.5" cy="10.5" r="6.5" />
+      <path d="m20 20-5-5M7.5 10.5h6M10.5 7.5v6" />
+    </>
+  ),
+  "zoom-out": (
+    <>
+      <circle cx="10.5" cy="10.5" r="6.5" />
+      <path d="m20 20-5-5M7.5 10.5h6" />
+    </>
+  ),
+  wireframe: (
+    <>
+      <path d="m12 3 9 5v8l-9 5-9-5V8l9-5Z" />
+      <path d="m3 8 18 8M21 8 3 16M12 3v18" />
+    </>
+  ),
 };
 
 /**

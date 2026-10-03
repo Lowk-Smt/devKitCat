@@ -25,7 +25,12 @@ export type IconName =
   | "cart"
   | "search"
   | "check"
-  | "trash";
+  | "trash"
+  | "rotate-left"
+  | "rotate-right"
+  | "zoom-in"
+  | "zoom-out"
+  | "wireframe";
 
 /** Deliverable format of a product. */
 export type ProductType =
@@ -42,6 +47,16 @@ export interface ProductDocumentation {
   summary: string;
   /** Topics covered by the bundled documentation. */
   topics: string[];
+}
+
+/** Public/static preview media, not a downloadable product file. */
+export interface ProductModelPreview {
+  /** Local path or HTTP(S) URL ending in .glb or .gltf. */
+  src: string;
+  /** Short name for gallery selection. */
+  label: string;
+  /** Text alternative describing the model, also shown below the viewer. */
+  description: string;
 }
 
 export interface Category {
@@ -64,12 +79,10 @@ export interface Product {
   category: string;
   /** Price in USD. */
   price: number;
-  /**
-   * Image paths for the product gallery (first image is the card preview).
-   * Empty for now — products fall back to the placeholder artwork until real
-   * assets are added.
-   */
+  /** Image paths for the gallery; the first image remains the card preview. */
   images: string[];
+  /** Optional interactive previews. Products without media keep their artwork. */
+  modelPreviews?: ProductModelPreview[];
   type: ProductType;
   version: string;
   features: string[];

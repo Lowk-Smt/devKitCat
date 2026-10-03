@@ -1,5 +1,6 @@
 import { ProductImage } from "@/components/product/ProductImage";
 import { ProductThumbnail } from "@/components/product/ProductThumbnail";
+import { ModelViewer } from "@/components/product/viewer/ModelViewer";
 import type { GalleryItem, GalleryPlaceholder } from "@/lib/gallery";
 import styles from "./GalleryStage.module.css";
 
@@ -27,6 +28,17 @@ function Placeholder({ item }: { item: GalleryPlaceholder }) {
  */
 export function GalleryStage({ item, priority = false }: GalleryStageProps) {
   switch (item.kind) {
+    case "model":
+      return (
+        <div className={styles.stage}>
+          <ModelViewer
+            key={item.id}
+            src={item.src}
+            title={item.title}
+            description={item.description}
+          />
+        </div>
+      );
     case "image":
       return (
         <div className={styles.stage}>
