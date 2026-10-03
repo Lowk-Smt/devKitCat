@@ -89,8 +89,7 @@
   overflow-wrap: anywhere;
 }
 
-.demoBadge,
-.demoOnly {
+.statusBadge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -211,9 +210,42 @@
   color: var(--text-faint);
 }
 
-.demoOnly {
-  margin-left: auto;
-  font-size: 0.56rem;
+.signOutForm {
+  display: grid;
+  min-width: 0;
+}
+
+.footerAction {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 2.75rem;
+  gap: 0.65rem;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.84rem;
+  font-weight: 530;
+  padding: 0.55rem 0.6rem;
+  text-align: left;
+  transition: background-color 0.16s ease, color 0.16s ease;
+}
+
+.footerAction:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.footerAction svg {
+  flex: 0 0 auto;
+  color: var(--text-faint);
+}
+
+.footerAction:focus-visible {
+  outline-offset: -2px;
 }
 
 .footerNote {
@@ -223,7 +255,7 @@
   line-height: 1.45;
 }
 
-.demoNotice {
+.accountNotice {
   display: flex;
   align-items: flex-start;
   gap: 0.7rem;
@@ -237,11 +269,11 @@
   line-height: 1.5;
 }
 
-.demoNotice p {
+.accountNotice p {
   min-width: 0;
 }
 
-.demoNotice strong {
+.accountNotice strong {
   color: #c8d2ff;
   font-weight: 640;
 }

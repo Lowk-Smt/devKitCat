@@ -1,37 +1,36 @@
-import Link from "next/link";
 import { AccountPageHeader } from "@/components/account/AccountPageHeader";
 import { AccountSection } from "@/components/account/AccountSection";
 import { SettingsForm } from "@/components/account/SettingsForm";
+import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
-import { mockAccountPresentation } from "@/data/mock-account";
+import { toIsoDate } from "@/lib/account-presentation";
 import { formatDate } from "@/lib/catalog";
+import { requireCustomer } from "@/lib/server/auth";
+import { signOutAction } from "@/lib/server/auth-actions";
 import styles from "@/components/account/AccountPage.module.css";
 
 export const metadata = {
   title: "Account settings",
 };
 
-export default function AccountSettingsPage() {
-  const { customer } = mockAccountPresentation;
+export default async function AccountSettingsPage() {
+  const customer = await requireCustomer();
+  const memberSince = toIsoDate(customer.createdAt);
 
   return (
     <div className={styles.page}>
       <AccountPageHeader
         eyebrow="Your account"
         title="Account settings"
-        description="Review the profile and preference controls for this frontend-only demo."
+        description="Review and update the profile and preferences stored on your devKitCat account."
       />
 
       <div className={styles.settingsLayout}>
         <AccountSection
           title="Profile & preferences"
-          description="Use the controls to preview the settings layout. No changes are saved."
+          description="Changes are saved to your customer record. Your password and email address are not editable here."
         >
-          <SettingsForm
-            name={customer.name}
-            email={customer.email}
-            preferences={customer.preferences}
-          />
+          <SettingsForm customer={customer} />
         </AccountSection>
 
         <div className={styles.stack}>
@@ -42,7 +41,7 @@ export default function AccountSettingsPage() {
                   <Icon name="user" size={18} />
                 </span>
                 <div className={styles.factCopy}>
-                  <h3 className={styles.factTitle}>Demo profile</h3>
+                  <h3 className={styles.factTitle}>Signed-in profile</h3>
                   <p className={styles.factDescription}>
                     {customer.name} · {customer.email}
                   </p>
@@ -55,20 +54,22 @@ export default function AccountSettingsPage() {
                 <div className={styles.factCopy}>
                   <h3 className={styles.factTitle}>Member since</h3>
                   <p className={styles.factDescription}>
-                    <time dateTime={customer.memberSince}>
-                      {formatDate(customer.memberSince)}
-                    </time>
+                    <time dateTime={memberSince}>{formatDate(memberSince)}</time>
                   </p>
                 </div>
               </div>
             </div>
             <p className={styles.summaryNote}>
-              This fixed demo identity is not authenticated and has no stored session.
+              This session is stored on the server and ends when you sign out or
+              when it expires. Your password is kept only as a salted scrypt
+              hash.
             </p>
-            <Link className={styles.inlineLink} href="/login">
-              <Icon name="user" size={16} />
-              Sign out preview <Icon name="arrow-up-right" size={14} />
-            </Link>
+            <form action={signOutAction} className={styles.sessionRow}>
+              <Button type="submit" variant="secondary" size="sm">
+                <Icon name="user" size={16} />
+                Sign out
+              </Button>
+            </form>
           </AccountSection>
 
           <AccountSection title="Not connected yet">
@@ -77,9 +78,11 @@ export default function AccountSettingsPage() {
                 <Icon name="info" size={18} />
               </span>
               <div className={styles.factCopy}>
-                <h3 className={styles.factTitle}>Account services are deferred</h3>
+                <h3 className={styles.factTitle}>Deferred account services</h3>
                 <p className={styles.factDescription}>
-                  Authentication, profile persistence, payments, and secure file delivery are not part of this frontend milestone.
+                  Checkout, payment processing, secure file delivery, email
+                  verification, password recovery, and social sign-in are not
+                  part of this milestone.
                 </p>
               </div>
             </div>

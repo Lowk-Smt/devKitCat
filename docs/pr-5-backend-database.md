@@ -5,6 +5,13 @@ and Prisma for marketplace catalog reads and establishes customer/order/download
 models for later work. It does **not** implement authentication, authorization,
 checkout, payments, or file delivery.
 
+> **Superseded in part by PR #6.** This document records the PR #5 foundation as
+> delivered. Authentication, sessions, protected routes, and customer-scoped
+> account reads are now implemented — see
+> [`pr-6-authentication.md`](pr-6-authentication.md). Statements below that defer
+> those features, describe the `Customer` model without credentials, or describe
+> the account routes as the PR #4 demo UI are historical, not current.
+
 ## Stack and compatibility
 
 - PostgreSQL
@@ -92,7 +99,8 @@ already shown by PR #4:
   creation/update timestamps. Product documentation summary/topics are stored
   with Product; no CMS is added.
 - **Customer** — unique email, name, timestamps. No password or credential
-  column exists.
+  column existed at this point (PR #6 later added `passwordHash`,
+  `themePreference`, `productUpdates`, and `releaseNotes`).
 - **Order** — customer relation, status, total, currency, timestamps.
 - **OrderItem** — product relation plus title/slug/category/version and
   unit-price snapshots, quantity, display position, and timestamps captured for
@@ -127,8 +135,10 @@ configured and the current fixture fallback otherwise:
 
 - `listProducts`, `getProductBySlug`, `getProductById`, and `listCategories`
 - `getRelatedProducts`
-- `getCustomerByEmail`, `getCustomerById`, `listCustomerOrders`, `getOrderById`,
-  and `listCustomerDownloads`
+- `listCustomerOrders`, `getCustomerOrderById`, and `listCustomerDownloads`
+  (PR #6 removed the identity lookups and the unscoped `getOrderById`, and made
+  every account read require the owning customer ID — see
+  [`pr-6-authentication.md`](pr-6-authentication.md))
 
 `src/lib/server/data-access-core.ts` contains typed relation mapping and a
 unit-testable Prisma-client seam; raw Prisma reads are kept out of components.
@@ -139,11 +149,12 @@ Client search, filters, sorting, card/gallery contracts, Three.js previews, and
 the local cart remain intact. The cart continues to use the existing fixture
 IDs/prices; it is still not a server cart or a checkout mechanism.
 
-The account routes deliberately remain connected to the fixed PR #4 demo UI
-fixtures. The new customer/order/download read functions and seed records are
-foundation-only and are not used as an authenticated account experience. The
-read functions do not enforce authorization; **do not use customer/order reads
-for real user data until a later PR adds verified identity and ownership checks**.
+At this point the account routes remained connected to the fixed PR #4 demo UI
+fixtures, the new customer/order/download read functions and seed records were
+foundation-only, and the read functions did not enforce authorization. **PR #6
+closed that gap**: the account routes now require a verified session, the
+identity lookups and the unscoped `getOrderById` were removed, and every
+customer/order/download read requires the owning customer ID.
 
 ## Vercel deployment
 
@@ -161,11 +172,13 @@ Edge middleware or Client Components. The current routes use the Node runtime.
 
 ## Explicitly deferred
 
-The following are still future PR work and are not implied by the database
-models or demo fixtures:
+The following were future PR work at the time and are not implied by the
+database models or demo fixtures (the first two bullets were delivered by PR #6;
+the rest remain deferred):
 
-- Authentication, session management, and protected routes.
-- Password handling/storage or OAuth/social login.
+- Authentication, session management, and protected routes. *(PR #6)*
+- Password handling/storage — but not OAuth/social login, which stays deferred.
+  *(PR #6)*
 - Payments, checkout, Stripe, PayPal, or other payment providers.
 - Secure download authorization, signed URLs, or file serving.
 - Admin/product-management UI or any of the unrelated services listed out of

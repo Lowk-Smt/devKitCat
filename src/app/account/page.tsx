@@ -6,8 +6,10 @@ import { PurchaseCard } from "@/components/account/PurchaseCard";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Icon } from "@/components/ui/Icon";
-import { getMockDownloads, getMockOrders, mockAccountPresentation } from "@/data/mock-account";
+import { toIsoDate } from "@/lib/account-presentation";
 import { formatDate } from "@/lib/catalog";
+import { requireCustomer } from "@/lib/server/auth";
+import { listCustomerDownloads, listCustomerOrders } from "@/lib/server/data-access";
 import styles from "@/components/account/AccountPage.module.css";
 
 export const metadata = {
@@ -35,10 +37,13 @@ const QUICK_LINKS = [
   },
 ] as const;
 
-export default function AccountOverviewPage() {
-  const { customer } = mockAccountPresentation;
-  const orders = getMockOrders();
-  const downloads = getMockDownloads();
+export default async function AccountOverviewPage() {
+  const customer = await requireCustomer();
+  const [orders, downloads] = await Promise.all([
+    listCustomerOrders(customer.id),
+    listCustomerDownloads(customer.id),
+  ]);
+  const memberSince = toIsoDate(customer.createdAt);
 
   return (
     <div className={styles.page}>
@@ -57,7 +62,7 @@ export default function AccountOverviewPage() {
         <div className={styles.stack}>
           <AccountSection
             title="Recent purchases"
-            description="A quick look at your latest demo orders."
+            description="A quick look at your latest orders."
             action={
               <Link className={styles.inlineLink} href="/account/purchases">
                 All purchases <Icon name="arrow-right" size={15} />
@@ -87,7 +92,7 @@ export default function AccountOverviewPage() {
 
           <AccountSection
             title="Your library"
-            description="Purchased resources in this demo account. File delivery is not enabled."
+            description="Purchased resources linked to your account. File delivery is not enabled yet."
             action={
               <Link className={styles.inlineLink} href="/account/downloads">
                 Open library <Icon name="arrow-right" size={15} />
@@ -108,7 +113,7 @@ export default function AccountOverviewPage() {
               <EmptyState
                 icon="download"
                 title="Your library is empty"
-                description="Resources from completed demo purchases will show here."
+                description="Resources from completed purchases will show here."
                 headingLevel={3}
                 action={
                   <Button href="/products" variant="secondary" size="sm">
@@ -134,9 +139,7 @@ export default function AccountOverviewPage() {
               <div className={styles.detailRow}>
                 <dt className={styles.detailLabel}>Member since</dt>
                 <dd className={styles.detailValue}>
-                  <time dateTime={customer.memberSince}>
-                    {formatDate(customer.memberSince)}
-                  </time>
+                  <time dateTime={memberSince}>{formatDate(memberSince)}</time>
                 </dd>
               </div>
             </dl>

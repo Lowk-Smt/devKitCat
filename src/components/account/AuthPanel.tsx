@@ -2,10 +2,16 @@ import Link from "next/link";
 import { AuthForm, type AuthFormMode } from "@/components/account/AuthForm";
 import { Logo } from "@/components/layout/Logo";
 import { Icon } from "@/components/ui/Icon";
+import { cx } from "@/lib/cx";
+import type { AuthNotice } from "@/lib/account-presentation";
 import styles from "./AuthPanel.module.css";
 
 interface AuthPanelProps {
   mode: AuthFormMode;
+  /** Optional sign-out/unavailability banner derived from the query string. */
+  notice?: AuthNotice | null;
+  /** True when no database is configured, so accounts cannot be verified. */
+  unavailable?: boolean;
 }
 
 const ACCOUNT_AREAS = [
@@ -14,12 +20,31 @@ const ACCOUNT_AREAS = [
   { icon: "settings", text: "Profile preferences" },
 ] as const;
 
-export function AuthPanel({ mode }: AuthPanelProps) {
+export function AuthPanel({ mode, notice = null, unavailable = false }: AuthPanelProps) {
+  const isRegister = mode === "register";
+
   return (
     <section className={styles.page}>
       <div className={styles.container}>
         <div className={styles.layout}>
-          <AuthForm mode={mode} />
+          <div className={styles.formColumn}>
+            {notice ? (
+              <div
+                className={cx(
+                  styles.notice,
+                  notice.tone === "warning" && styles.noticeWarning,
+                )}
+                role="status"
+              >
+                <Icon name="info" size={17} />
+                <p>
+                  <strong>{notice.title}</strong>
+                  <span>{notice.body}</span>
+                </p>
+              </div>
+            ) : null}
+            <AuthForm mode={mode} unavailable={unavailable} />
+          </div>
           <aside className={styles.intro}>
             <Link className={styles.brand} href="/" aria-label="devKitCat homepage">
               <Logo size={30} />
@@ -41,14 +66,14 @@ export function AuthPanel({ mode }: AuthPanelProps) {
                 </li>
               ))}
             </ul>
-            <div className={styles.previewNote}>
-              <span className={styles.previewDot} aria-hidden="true" />
+            <div className={styles.statusNote}>
+              <span className={styles.statusDot} aria-hidden="true" />
               <p>
-                <strong>Preview state</strong>
+                <strong>Signed out</strong>
                 <span>
-                  {mode === "login"
-                    ? "You are viewing the logged-out sign-in screen."
-                    : "You are viewing the logged-out registration screen."}
+                  {isRegister
+                    ? "Registration creates your devKitCat customer account and signs you in."
+                    : "Sign in with your devKitCat account to open purchases and downloads."}
                 </span>
               </p>
             </div>

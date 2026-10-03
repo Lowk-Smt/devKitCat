@@ -4,8 +4,9 @@ import { AccountSection } from "@/components/account/AccountSection";
 import { DownloadCard } from "@/components/account/DownloadCard";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { getMockDownloads } from "@/data/mock-account";
 import { parseAccountCollectionPreviewState } from "@/lib/account-presentation";
+import { requireCustomer } from "@/lib/server/auth";
+import { listCustomerDownloads } from "@/lib/server/data-access";
 import styles from "@/components/account/AccountPage.module.css";
 
 export const metadata = {
@@ -15,16 +16,18 @@ export const metadata = {
 export default async function DownloadsPage({
   searchParams,
 }: PageProps<"/account/downloads">) {
+  const customer = await requireCustomer();
   const params = await searchParams;
   const previewState = parseAccountCollectionPreviewState(params.preview);
-  const downloads = getMockDownloads();
+  // Scoped to the signed-in customer's own download records.
+  const downloads = await listCustomerDownloads(customer.id);
 
   return (
     <div className={styles.page}>
       <AccountPageHeader
         eyebrow="Your account"
         title="Downloads"
-        description="Find the resources linked to your demo purchases and review their catalog versions."
+        description="Find the resources linked to your purchases and review their catalog versions."
       />
 
       <AccountSection
@@ -41,7 +44,7 @@ export default async function DownloadsPage({
           <EmptyState
             icon="download"
             title="Your library is empty"
-            description="Purchased products will be listed here when account purchases are connected. This is an empty-state preview."
+            description="Purchased products will be listed here when checkout and delivery are connected. This is an empty-state preview."
             action={
               <Button href="/products" variant="secondary">
                 Browse products

@@ -6,10 +6,25 @@ export type OrderStatus = "complete" | "processing" | "refunded";
 /** Delivery remains disabled in the frontend; this is a display-only state. */
 export type DownloadStatus = "coming-soon";
 
+/** Theme choices offered by the existing account settings screen. */
+export type ThemePreference = "dark" | "system";
+
+/** Persisted customer preferences edited on `/account/settings`. */
+export interface CustomerPreferences {
+  theme: ThemePreference;
+  productUpdates: boolean;
+  releaseNotes: boolean;
+}
+
+/**
+ * The safe customer view shared with Server Components. It intentionally omits
+ * the password digest, session tokens, and every other credential field.
+ */
 export interface CustomerRecord {
   id: string;
   email: string;
   name: string;
+  preferences: CustomerPreferences;
   createdAt: Date;
   updatedAt: Date;
 }

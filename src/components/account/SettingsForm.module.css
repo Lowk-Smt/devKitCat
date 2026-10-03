@@ -118,6 +118,10 @@
   line-height: 1.5;
 }
 
+.messageError {
+  color: #ff9d9d;
+}
+
 @media (max-width: 660px) {
   .profileFields {
     grid-template-columns: minmax(0, 1fr);

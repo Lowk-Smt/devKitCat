@@ -32,7 +32,7 @@ export function OrderSummary({ order }: { order: ResolvedOrder }) {
         <div className={styles.summaryRow}>
           <dt>Payment</dt>
           <dd>
-            <strong>Demo record</strong>
+            <strong>Not processed</strong>
           </dd>
         </div>
       </dl>
@@ -42,7 +42,8 @@ export function OrderSummary({ order }: { order: ResolvedOrder }) {
         <strong>{formatPrice(order.total)}</strong>
       </p>
       <p className={styles.summaryNote}>
-        This is a frontend-only order fixture. No payment was processed.
+        Checkout is not part of devKitCat yet, so this order carries no payment
+        record.
       </p>
       <Button href="/account/downloads" variant="secondary" fullWidth>
         Go to downloads
