@@ -1,17 +1,19 @@
 import Link from "next/link";
 import { ProductCard } from "@/components/product/ProductCard";
 import { SectionHeading } from "@/components/ui/SectionHeading";
-import type { Product } from "@/types";
+import type { Category, Product } from "@/types";
 import { cx } from "@/lib/cx";
 import styles from "./FeaturedProductsSection.module.css";
 
 interface FeaturedProductsSectionProps {
   products: Product[];
+  categories: readonly Category[];
 }
 
-/** Homepage section showcasing featured products from the mock catalog. */
+/** Homepage section showcasing featured products supplied by the server. */
 export function FeaturedProductsSection({
   products,
+  categories,
 }: FeaturedProductsSectionProps) {
   return (
     <section
@@ -36,6 +38,9 @@ export function FeaturedProductsSection({
             <ProductCard
               key={product.id}
               product={product}
+              category={categories.find(
+                (category) => category.slug === product.category,
+              )}
               showFeaturedBadge={false}
             />
           ))}

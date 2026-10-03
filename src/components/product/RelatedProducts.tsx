@@ -1,16 +1,20 @@
 import { ProductCard } from "@/components/product/ProductCard";
 import { SectionHeading } from "@/components/ui/SectionHeading";
-import { getRelatedProducts } from "@/data/products";
-import type { Product } from "@/types";
+import { getRelatedProducts } from "@/lib/server/data-access";
+import type { Category, Product } from "@/types";
 import styles from "./RelatedProducts.module.css";
 
 interface RelatedProductsProps {
   product: Product;
+  categories: readonly Category[];
 }
 
 /** Same-category products first; never includes the current product. */
-export function RelatedProducts({ product }: RelatedProductsProps) {
-  const { items, sameCategory } = getRelatedProducts(product);
+export async function RelatedProducts({
+  product,
+  categories,
+}: RelatedProductsProps) {
+  const { items, sameCategory } = await getRelatedProducts(product);
   if (items.length === 0) return null;
 
   return (
@@ -27,7 +31,12 @@ export function RelatedProducts({ product }: RelatedProductsProps) {
       <ul className={styles.grid}>
         {items.map((item) => (
           <li key={item.id} className={styles.item}>
-            <ProductCard product={item} />
+            <ProductCard
+              product={item}
+              category={categories.find(
+                (category) => category.slug === item.category,
+              )}
+            />
           </li>
         ))}
       </ul>

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { connection } from "next/server";
 import { ProductBrowser } from "@/components/marketplace/ProductBrowser";
 import { SectionHeading } from "@/components/ui/SectionHeading";
-import { products } from "@/data/products";
+import { listCategories, listProducts } from "@/lib/server/data-access";
 import { cx } from "@/lib/cx";
 import styles from "./products.module.css";
 
@@ -16,6 +16,10 @@ export default async function ProductsPage() {
   // Render per request so the server HTML already reflects the URL's
   // search / category / sort (ProductBrowser reads them with useSearchParams).
   await connection();
+  const [products, categories] = await Promise.all([
+    listProducts(),
+    listCategories(),
+  ]);
 
   return (
     <div className={cx("section", styles.page)}>
@@ -26,7 +30,7 @@ export default async function ProductsPage() {
           title="Marketplace"
           description="Production-ready systems, UI kits, 3D assets, VFX, and tools — search the catalog or filter by category to find your next building block."
         />
-        <ProductBrowser products={products} />
+        <ProductBrowser products={products} categories={categories} />
       </div>
     </div>
   );

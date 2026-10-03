@@ -1,5 +1,8 @@
-import { getCategoryBySlug } from "@/data/categories";
-import type { Product, ProductType } from "@/types";
+import {
+  categories as defaultCategories,
+  getCategoryBySlug,
+} from "@/data/categories";
+import type { Category, Product, ProductType } from "@/types";
 
 /** Human-readable labels for each product type. */
 export const PRODUCT_TYPE_LABELS: Record<ProductType, string> = {
@@ -76,8 +79,14 @@ function normalize(text: string): string {
     .replace(/\p{M}/gu, "");
 }
 
-function searchText(product: BrowsableProduct): string {
-  const categoryName = getCategoryBySlug(product.category)?.name ?? "";
+function searchText(
+  product: BrowsableProduct,
+  categoryList: readonly Category[],
+): string {
+  const categoryName =
+    categoryList.find((category) => category.slug === product.category)?.name ??
+    getCategoryBySlug(product.category)?.name ??
+    "";
   return normalize(
     [
       product.title,
@@ -93,10 +102,11 @@ function searchText(product: BrowsableProduct): string {
 export function matchesQuery(
   product: BrowsableProduct,
   query: string,
+  categoryList: readonly Category[] = defaultCategories,
 ): boolean {
   const terms = normalize(query).split(/\s+/).filter(Boolean);
   if (terms.length === 0) return true;
-  const haystack = searchText(product);
+  const haystack = searchText(product, categoryList);
   return terms.every((term) => haystack.includes(term));
 }
 
@@ -124,9 +134,10 @@ function compareProducts(
 export function filterAndSortProducts<T extends BrowsableProduct>(
   items: readonly T[],
   { query, category, sort }: ProductFilters,
+  categoryList: readonly Category[] = defaultCategories,
 ): T[] {
   return items
     .filter((product) => !category || product.category === category)
-    .filter((product) => matchesQuery(product, query))
+    .filter((product) => matchesQuery(product, query, categoryList))
     .sort((a, b) => compareProducts(a, b, sort));
 }

@@ -4,11 +4,13 @@ import { ProductPreview } from "@/components/product/ProductPreview";
 import { Icon } from "@/components/ui/Icon";
 import { getCategoryBySlug } from "@/data/categories";
 import { formatPrice } from "@/lib/catalog";
-import type { Product } from "@/types";
+import type { Category, Product } from "@/types";
 import styles from "./ProductCard.module.css";
 
 interface ProductCardProps {
   product: Product;
+  /** Live server category, with the fixture used as a backward-compatible fallback. */
+  category?: Category;
   /** Hide the Featured badge where every item is featured anyway. */
   showFeaturedBadge?: boolean;
 }
@@ -23,14 +25,19 @@ const CARD_IMAGE_SIZES =
  */
 export function ProductCard({
   product,
+  category: providedCategory,
   showFeaturedBadge = true,
 }: ProductCardProps) {
-  const category = getCategoryBySlug(product.category);
+  const category = providedCategory ?? getCategoryBySlug(product.category);
 
   return (
     <article className={styles.card}>
       <div className={styles.media}>
-        <ProductPreview product={product} sizes={CARD_IMAGE_SIZES} />
+        <ProductPreview
+          product={product}
+          category={category}
+          sizes={CARD_IMAGE_SIZES}
+        />
         <ProductBadges
           isFeatured={product.isFeatured}
           isNew={product.isNew}

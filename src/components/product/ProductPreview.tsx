@@ -1,10 +1,11 @@
 import { ProductImage } from "@/components/product/ProductImage";
 import { ProductThumbnail } from "@/components/product/ProductThumbnail";
 import { getCategoryBySlug } from "@/data/categories";
-import type { Product } from "@/types";
+import type { Category, Product } from "@/types";
 
 interface ProductPreviewProps {
   product: Product;
+  category?: Category;
   sizes: string;
 }
 
@@ -13,8 +14,12 @@ interface ProductPreviewProps {
  * one, otherwise the placeholder artwork. Decorative — the card's link text
  * already names the product.
  */
-export function ProductPreview({ product, sizes }: ProductPreviewProps) {
-  const category = getCategoryBySlug(product.category);
+export function ProductPreview({
+  product,
+  category: providedCategory,
+  sizes,
+}: ProductPreviewProps) {
+  const category = providedCategory ?? getCategoryBySlug(product.category);
   const placeholder = (
     <ProductThumbnail
       icon={category?.icon ?? "templates"}

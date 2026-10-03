@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ProductArtwork } from "@/components/account/ProductArtwork";
 import { Icon } from "@/components/ui/Icon";
 import { formatPrice } from "@/lib/catalog";
-import type { ResolvedOrderItem } from "@/data/mock-account";
+import type { ResolvedOrderItem } from "@/types/account";
 import styles from "./OrderLineItem.module.css";
 
 export function OrderLineItem({ item }: { item: ResolvedOrderItem }) {

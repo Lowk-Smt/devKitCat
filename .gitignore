@@ -30,8 +30,12 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
+# env files (only the safe template is tracked)
 .env*
+!.env.example
+
+# Prisma-generated client
+/src/generated/prisma/
 
 # vercel
 .vercel

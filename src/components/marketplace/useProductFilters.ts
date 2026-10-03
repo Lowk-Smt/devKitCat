@@ -2,7 +2,8 @@
 
 import { usePathname, useSearchParams } from "next/navigation";
 import { useCallback, useMemo } from "react";
-import { getCategoryBySlug } from "@/data/categories";
+import { categories as defaultCategories } from "@/data/categories";
+import type { Category } from "@/types";
 import {
   DEFAULT_SORT,
   parseSort,
@@ -24,7 +25,9 @@ type HistoryMode = "push" | "replace";
  * `useSearchParams` — no server round trip for what is purely client-side
  * filtering of local data.
  */
-export function useProductFilters() {
+export function useProductFilters(
+  availableCategories: readonly Category[] = defaultCategories,
+) {
   const searchParams = useSearchParams();
   const pathname = usePathname();
 
@@ -36,10 +39,13 @@ export function useProductFilters() {
     () => ({
       query: rawQuery,
       category:
-        rawCategory && getCategoryBySlug(rawCategory) ? rawCategory : undefined,
+        rawCategory &&
+        availableCategories.some((category) => category.slug === rawCategory)
+          ? rawCategory
+          : undefined,
       sort: parseSort(rawSort),
     }),
-    [rawQuery, rawCategory, rawSort],
+    [rawQuery, rawCategory, rawSort, availableCategories],
   );
 
   const update = useCallback(

@@ -1,8 +1,9 @@
-import { categories } from "@/data/categories";
+import type { Category } from "@/types";
 import { cx } from "@/lib/cx";
 import styles from "./CategoryFilter.module.css";
 
 interface CategoryFilterProps {
+  categories: readonly Category[];
   /** Active category slug, or `undefined` for all. */
   value: string | undefined;
   onChange: (category: string | undefined) => void;
@@ -13,6 +14,7 @@ interface CategoryFilterProps {
 
 /** Category chips. Toggle buttons, so state is exposed via `aria-pressed`. */
 export function CategoryFilter({
+  categories,
   value,
   onChange,
   counts,
