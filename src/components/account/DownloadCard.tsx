@@ -3,10 +3,7 @@ import { ProductArtwork } from "@/components/account/ProductArtwork";
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import { formatDate } from "@/lib/catalog";
-import type {
-  MockDownloadStatus,
-  ResolvedDownload,
-} from "@/data/mock-account";
+import type { DownloadStatus, ResolvedDownload } from "@/types/account";
 import styles from "./DownloadCard.module.css";
 
 interface DownloadCardProps {
@@ -14,7 +11,7 @@ interface DownloadCardProps {
   compact?: boolean;
 }
 
-const DOWNLOAD_STATUS_LABELS: Record<MockDownloadStatus, string> = {
+const DOWNLOAD_STATUS_LABELS: Record<DownloadStatus, string> = {
   "coming-soon": "Delivery coming soon",
 };
 

@@ -8,32 +8,32 @@ import { useProductFilters } from "@/components/marketplace/useProductFilters";
 import { ProductCard } from "@/components/product/ProductCard";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { categories, getCategoryBySlug } from "@/data/categories";
 import { filterAndSortProducts, matchesQuery } from "@/lib/catalog";
-import type { Product } from "@/types";
+import type { Category, Product } from "@/types";
 import styles from "./ProductBrowser.module.css";
 
 interface ProductBrowserProps {
   products: Product[];
+  categories: Category[];
 }
 
 /**
  * The marketplace's interactive browsing experience: search, category filter,
  * and sorting all combine, and all live in the URL.
  */
-export function ProductBrowser({ products }: ProductBrowserProps) {
+export function ProductBrowser({ products, categories }: ProductBrowserProps) {
   const { filters, hasActiveFilters, setQuery, setCategory, setSort, reset } =
-    useProductFilters();
+    useProductFilters(categories);
 
   const results = useMemo(
-    () => filterAndSortProducts(products, filters),
-    [products, filters],
+    () => filterAndSortProducts(products, filters, categories),
+    [products, filters, categories],
   );
 
   // Category chip counts follow the search, so they match what you'd get.
   const counts = useMemo(() => {
     const searched = products.filter((product) =>
-      matchesQuery(product, filters.query),
+      matchesQuery(product, filters.query, categories),
     );
     return Object.fromEntries(
       categories.map((category) => [
@@ -41,10 +41,10 @@ export function ProductBrowser({ products }: ProductBrowserProps) {
         searched.filter((product) => product.category === category.slug).length,
       ]),
     );
-  }, [products, filters.query]);
+  }, [products, filters.query, categories]);
 
   const activeCategory = filters.category
-    ? getCategoryBySlug(filters.category)
+    ? categories.find((category) => category.slug === filters.category)
     : undefined;
   const trimmedQuery = filters.query.trim();
 
@@ -56,6 +56,7 @@ export function ProductBrowser({ products }: ProductBrowserProps) {
           <SortSelect value={filters.sort} onChange={setSort} />
         </div>
         <CategoryFilter
+          categories={categories}
           value={filters.category}
           onChange={setCategory}
           counts={counts}
@@ -85,7 +86,12 @@ export function ProductBrowser({ products }: ProductBrowserProps) {
         <ul className={styles.grid}>
           {results.map((product) => (
             <li key={product.id} className={styles.gridItem}>
-              <ProductCard product={product} />
+              <ProductCard
+                product={product}
+                category={categories.find(
+                  (category) => category.slug === product.category,
+                )}
+              />
             </li>
           ))}
         </ul>

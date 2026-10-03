@@ -1,7 +1,7 @@
 import { OrderStatus } from "@/components/account/OrderStatus";
 import { Button } from "@/components/ui/Button";
 import { formatDate, formatPrice } from "@/lib/catalog";
-import type { ResolvedOrder } from "@/data/mock-account";
+import type { ResolvedOrder } from "@/types/account";
 import styles from "@/components/account/AccountPage.module.css";
 
 export function OrderSummary({ order }: { order: ResolvedOrder }) {

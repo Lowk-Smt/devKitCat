@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { connection } from "next/server";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ProductBadges } from "@/components/product/ProductBadges";
@@ -7,8 +8,11 @@ import { RelatedProducts } from "@/components/product/RelatedProducts";
 import { ProductDetailSections } from "@/components/product/detail/ProductDetailSections";
 import { SectionNav } from "@/components/product/detail/SectionNav";
 import { ProductGallery } from "@/components/product/gallery/ProductGallery";
-import { getCategoryBySlug } from "@/data/categories";
-import { getProductBySlug, products } from "@/data/products";
+import { products as demoProducts } from "@/data/products";
+import {
+  getProductBySlug,
+  listCategories,
+} from "@/lib/server/data-access";
 import { formatDate, PRODUCT_TYPE_LABELS } from "@/lib/catalog";
 import { buildGalleryItems } from "@/lib/gallery";
 import styles from "./product.module.css";
@@ -18,14 +22,17 @@ interface ProductPageProps {
 }
 
 export function generateStaticParams() {
-  return products.map((product) => ({ slug: product.slug }));
+  // Keep the existing demo product paths available at build time. `dynamicParams`
+  // remains enabled so a database-backed slug can render on its first request.
+  return demoProducts.map((product) => ({ slug: product.slug }));
 }
 
 export async function generateMetadata({
   params,
 }: ProductPageProps): Promise<Metadata> {
+  await connection();
   const { slug } = await params;
-  const product = getProductBySlug(slug);
+  const product = await getProductBySlug(slug);
 
   if (!product) {
     return { title: "Product not found" };
@@ -38,14 +45,20 @@ export async function generateMetadata({
 }
 
 export default async function ProductPage({ params }: ProductPageProps) {
+  await connection();
   const { slug } = await params;
-  const product = getProductBySlug(slug);
+  const [product, categories] = await Promise.all([
+    getProductBySlug(slug),
+    listCategories(),
+  ]);
 
   if (!product) {
     notFound();
   }
 
-  const category = getCategoryBySlug(product.category);
+  const category = categories.find(
+    (candidate) => candidate.slug === product.category,
+  );
   const galleryItems = buildGalleryItems(product, {
     categoryName: category?.name ?? "Product",
     icon: category?.icon ?? "templates",
@@ -132,7 +145,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
           <ProductDetailSections product={product} />
         </div>
 
-        <RelatedProducts product={product} />
+        <RelatedProducts product={product} categories={categories} />
       </div>
     </div>
   );

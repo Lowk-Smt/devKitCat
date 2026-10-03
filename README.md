@@ -8,36 +8,37 @@ tools, templates, and complete starter kits.
 
 ## Status
 
-This repository includes the merged foundation (PR #1), marketplace experience
-(PR #2), and interactive 3D previews (PR #3). Current work is **PR #4 — customer
-account frontend**:
+PRs #1 (marketplace foundation/design system), #2 (browsing/search/product
+pages/cart UI), #3 (Three.js previews), and #4 (customer/account UI) are merged.
+This branch contains the completed implementation for **PR #5 — PostgreSQL +
+Prisma backend/database foundation** and is ready for review; PR #5 is not yet merged:
 
-- `/products` is a full marketplace: search, category filter, sorting (Featured,
-  Newest, price low→high / high→low), result count, and empty / no-results
-  states. Filters combine and live in the URL (`?q=&category=&sort=`).
-- Polished product cards with Featured / New badges.
-- Product detail pages with a gallery, purchase CTAs, and Overview, Features,
-  Requirements, What's included, Installation, Documentation, Changelog and
-  License sections, plus related products.
-- A reusable, media-aware product gallery (`GalleryItem` list → stage +
-  thumbnails), now including interactive GLB/GLTF model previews.
-- A client-only, lazy-loaded Three.js viewer: orbit/touch, zoom, reset,
-  wireframe, automatic framing, and loading/error/retry states. Small original
-  local sample models demonstrate both supported formats.
-- A client-side **cart UI** (header button + drawer, persisted in
-  `localStorage`). It is UI only — there is no checkout.
-- Customer account screens: overview, purchases, order details, downloads,
-  settings, login, and registration. They use centralized mock data and clearly
-  labeled frontend-only states; forms do not send or store credentials.
+- `/` and the marketplace/product routes read products and categories through a
+  server-only data-access layer when `DATABASE_URL` is configured. Without it,
+  the existing catalog fixtures remain a database-free preview fallback.
+- The marketplace UI remains client-interactive: search, category filters,
+  sorting, result counts, cards, product detail, related products, galleries,
+  and 3D previews keep their existing component contracts.
+- A normalized initial schema, migration, and repeatable seed cover products,
+  categories, the demo customer, its historical orders/items, and download
+  records.
+- Customer account screens remain the intentional PR #4 frontend demo. Their
+  displayed identity, purchases, and downloads are still fixed fixtures; the
+  database model/read layer does not authenticate visitors or protect routes.
+- The client-side **cart UI** remains local-only (`localStorage`) and has no
+  checkout or payment behavior.
 
-Not yet implemented (left for future PRs): backend persistence, real
-authentication, payments/checkout, admin tooling, secure downloads, real
-production product imagery, reviews, and online documentation pages.
+Not yet implemented (left for future PRs): authentication/session management,
+password handling, protected routes, payments/checkout, secure downloads, admin
+tooling, real production product imagery, reviews, and online documentation
+pages. See [`docs/pr-5-backend-database.md`](docs/pr-5-backend-database.md) for
+local database and deployment setup.
 
 ## Tech stack
 
 - [Next.js 16](https://nextjs.org) (App Router, Turbopack) + React 19
 - TypeScript
+- PostgreSQL + Prisma ORM 7 (PostgreSQL driver adapter)
 - [Three.js](https://threejs.org) + GLTFLoader / OrbitControls (no React 3D framework)
 - ESLint (`eslint-config-next`)
 - Plain CSS — global design tokens + CSS Modules (no UI framework)
@@ -46,22 +47,41 @@ production product imagery, reviews, and online documentation pages.
 ## Getting started
 
 ```bash
-npm install
+npm ci
+# Database-free frontend preview:
+npm run dev
+
+# To use PostgreSQL-backed marketplace reads:
+cp .env.example .env
+# Edit .env and replace the placeholder DATABASE_URL.
+npm run db:generate
+npm run db:migrate
+npm run db:seed
 npm run dev
 ```
+
+The app can still run without `DATABASE_URL`; marketplace reads then use the
+existing demo fixtures. Migrations and seeding require a reachable PostgreSQL
+database. See the [backend/database guide](docs/pr-5-backend-database.md) for
+exact setup details.
 
 Open [http://localhost:3000](http://localhost:3000).
 
 ## Scripts
 
-| Command             | Description                              |
-| ------------------- | ---------------------------------------- |
-| `npm run dev`       | Start the development server             |
-| `npm run build`     | Production build                         |
-| `npm run start`     | Serve the production build               |
-| `npm run lint`      | Run ESLint                               |
-| `npm run typecheck` | Run TypeScript checks without emitting   |
-| `npm test`          | Account-state and form-safety helpers, gallery, source validation, framing, cleanup and demo-asset tests (Node 22.17+) |
+| Command                         | Description                                                        |
+| ------------------------------- | ------------------------------------------------------------------ |
+| `npm run dev`                   | Generate Prisma Client, then start the development server          |
+| `npm run build`                 | Generate Prisma Client, then create the production build           |
+| `npm run start`                 | Serve the production build                                         |
+| `npm run lint`                  | Run ESLint                                                         |
+| `npm run typecheck`             | Generate Prisma Client and run TypeScript checks without emitting |
+| `npm test`                      | Run existing UI tests plus seed/data-access unit tests             |
+| `npm run db:generate`           | Generate Prisma Client (does not connect to PostgreSQL)            |
+| `npm run db:migrate`            | Apply/create development migrations; requires `DATABASE_URL`       |
+| `npm run db:deploy`             | Apply committed migrations in deployment environments              |
+| `npm run db:seed`               | Idempotently seed the existing marketplace/demo fixture values     |
+| `npm run db:studio`             | Open Prisma Studio against `DATABASE_URL`                          |
 
 ## Routes
 
@@ -69,7 +89,7 @@ Open [http://localhost:3000](http://localhost:3000).
 | ------------------ | -------------------------------------------------- |
 | `/`                | Homepage                                           |
 | `/products`        | Marketplace (`?q=`, `?category=`, `?sort=` — all optional, combinable) |
-| `/products/:slug`  | Product detail (static params from mock data, 404 for unknown slugs) |
+| `/products/:slug`  | Product detail (known demo slugs are predeclared; configured DB slugs are read at request time, unknown slugs 404) |
 | `/login`            | Sign-in UI preview; no authentication or credential handling |
 | `/register`         | Registration UI preview; no account creation |
 | `/account`          | Demo customer overview |
@@ -81,61 +101,67 @@ Open [http://localhost:3000](http://localhost:3000).
 ## Project structure
 
 ```
+prisma/
+├── schema.prisma          # PostgreSQL marketplace/account data model
+├── migrations/            # Initial reproducible schema migration
+└── seed.ts                 # Idempotent fixture-based Prisma seed
 src/
-├── app/                  # Routes, layout, global styles
-│   ├── products/         # Catalog + product detail routes
-│   ├── account/          # Customer overview, purchases, downloads, settings
-│   ├── login/            # Frontend-only sign-in screen
-│   ├── register/         # Frontend-only registration screen
-│   ├── globals.css       # Design tokens & layout primitives
-│   ├── layout.tsx        # Shell: header, main, footer
-│   └── page.tsx          # Homepage composition
-├── components/
-│   ├── account/          # Customer shell, navigation, cards, forms and states
-│   ├── cart/             # CartProvider, drawer, header button (UI only)
-│   ├── category/         # CategoryCard
-│   ├── layout/           # Header, Footer, Logo
-│   ├── marketplace/      # ProductBrowser, search, sort, category filter
-│   ├── product/          # ProductCard, badges, image, gallery/, detail/, viewer/
-│   ├── sections/         # Homepage sections
-│   └── ui/               # Button, SectionHeading, Icon, EmptyState
-├── data/                 # Mock categories, products, and customer/order fixtures
-├── lib/                  # Catalog search/sort, account view states, cart store, helpers
-└── types/                # Shared catalog types
+├── app/                    # Routes, layout, global styles
+│   ├── products/           # DB-backed catalog + product detail routes
+│   ├── account/            # Intentionally frontend-only demo account pages
+│   ├── login/              # Frontend-only sign-in screen
+│   ├── register/           # Frontend-only registration screen
+│   ├── globals.css         # Design tokens & layout primitives
+│   ├── layout.tsx          # Shell: header, main, footer
+│   └── page.tsx            # Homepage composition
+├── components/              # Existing marketplace, account, cart and 3D UI
+├── data/                    # Existing fixtures, seed values and no-DB fallback
+├── lib/server/              # Server-only Prisma client, data access and seeding
+├── lib/                     # Catalog search/sort, account states, cart store, helpers
+└── types/                   # Shared catalog and account read types
 ```
 
 ## Data
 
-All catalog content lives in `src/data` as static mock data. The `Product`
-type in `src/types` covers everything the UI renders (`images`, `modelPreviews`,
-`overview`, `features`, `requirements`, `includedFiles`, `installation`, `documentation`,
-`changelog`, `license`, `releasedAt`, `isFeatured`, `isNew`, …), so pages are
-driven by data rather than per-page markup. Search, filtering, and sorting are
-pure functions in `src/lib/catalog.ts`.
+`src/data/categories.ts` and `src/data/products.ts` preserve the existing catalog
+fixtures as deterministic seed input and as the explicit no-`DATABASE_URL`
+fallback. When PostgreSQL is configured, Server Components use
+`src/lib/server/data-access.ts`; Prisma and `DATABASE_URL` stay on the server.
+The existing `Product` type in `src/types` still covers everything rendered
+(`images`, `modelPreviews`, `overview`, `features`, `requirements`,
+`includedFiles`, `installation`, `documentation`, `changelog`, `license`,
+`releasedAt`, `isFeatured`, `isNew`, …). Search, filtering, and sorting remain
+pure functions in `src/lib/catalog.ts` and run in the existing browser UI.
 
-Cards still use the first `images` entry, or the original placeholder artwork.
+Product cards still use the first gallery image or the original placeholder.
 Detail galleries show `modelPreviews` first, then `images`, with a placeholder
-when both are empty. Non-3D products do not need any new fields.
+when both are empty. The local cart continues to resolve known fixture product
+IDs; checkout and server-side cart validation are not part of this PR.
 
 ## Customer account frontend (PR #4)
 
-The customer routes are an integrated **frontend-only preview**. The fixed demo
-identity, order records, and product-ID download entries live together in
+The customer routes remain an integrated **frontend-only preview**. Their fixed
+demo identity, order records, and product-ID download entries live in
 `src/data/mock-account.ts`; catalog product names, categories, versions, and file
-counts are resolved from the existing `src/data/products.ts` data. The account
-presentation fixture is centralized and deliberately has no login/logout logic,
-client storage, sessions, or access control.
+counts come from the existing product fixtures. The same demo concepts are
+included in the optional database seed, but the account UI continues to read its
+centralized mock data and has no login/logout logic, client storage, sessions,
+or access control.
 
 `/login` and `/register` are visual states only. Their forms use browser/client
 validation and explicitly discard the entered values; they do not transmit or
 store passwords or create accounts. Settings are presentational and are not
 persisted. Download buttons are disabled and do not point to a file or endpoint.
+The new customer/order/download data-access functions are server-only building
+blocks, not authentication or authorization; callers must add both before using
+them for private customer data.
 
-Authentication, backend persistence, payment processing, and secure downloads
-are intentionally deferred. To inspect collection UI states without a service,
-append `?preview=empty`, `?preview=loading`, or `?preview=error` to
-`/account/purchases` or `/account/downloads`; the default state is populated.
-These are fixed visual examples, not simulated requests.
+Authentication/session management, password handling, protected routes,
+payment processing, checkout, and secure downloads are intentionally deferred.
+To inspect collection UI states without a service, append `?preview=empty`,
+`?preview=loading`, or `?preview=error` to `/account/purchases` or
+`/account/downloads`; the default state is populated. These are fixed visual
+examples, not simulated requests.
 
 ## 3D previews
 

@@ -1,5 +1,4 @@
 import type { Product } from "@/types";
-import { filterAndSortProducts } from "@/lib/catalog";
 import type { CategorySlug } from "./categories";
 
 interface MockProduct extends Omit<Product, "category"> {
@@ -7,8 +6,8 @@ interface MockProduct extends Omit<Product, "category"> {
 }
 
 /**
- * Mock product catalog for the foundation release.
- * Local/static data only — no backend persistence in this PR.
+ * Existing product fixtures used for deterministic database seeding, the
+ * database-free demo fallback, and the client-only cart's known product IDs.
  */
 export const products: MockProduct[] = [
   {
@@ -360,45 +359,3 @@ export const products: MockProduct[] = [
     isNew: true,
   },
 ];
-
-export function getFeaturedProducts(): MockProduct[] {
-  return products.filter((product) => product.isFeatured);
-}
-
-export function getProductBySlug(slug: string): MockProduct | undefined {
-  return products.find((product) => product.slug === slug);
-}
-
-export interface RelatedProducts {
-  items: MockProduct[];
-  /** True when at least one item shares the product's category. */
-  sameCategory: boolean;
-}
-
-/**
- * Related products for a detail page: same-category products first, topped up
- * from the rest of the catalog (featured, then newest) if there are fewer than
- * `limit`. The product itself is never included. No popularity data involved.
- */
-export function getRelatedProducts(
-  product: Pick<Product, "id" | "category">,
-  limit = 3,
-): RelatedProducts {
-  const others = products.filter((item) => item.id !== product.id);
-  const sameCategory = filterAndSortProducts(
-    others.filter((item) => item.category === product.category),
-    { query: "", category: undefined, sort: "featured" },
-  );
-  const rest = others
-    .filter((item) => item.category !== product.category)
-    .sort(
-      (a, b) =>
-        Number(b.isFeatured) - Number(a.isFeatured) ||
-        b.releasedAt.localeCompare(a.releasedAt),
-    );
-
-  return {
-    items: [...sameCategory, ...rest].slice(0, limit),
-    sameCategory: sameCategory.length > 0,
-  };
-}

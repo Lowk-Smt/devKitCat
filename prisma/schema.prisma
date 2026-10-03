@@ -1,0 +1,204 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum CategoryIcon {
+  SYSTEMS
+  UI_KITS
+  ASSETS_3D
+  VFX
+  AUDIO
+  DEVELOPER_TOOLS
+  TEMPLATES
+  COMPLETE_KITS
+}
+
+enum ProductType {
+  SYSTEM
+  UI_KIT
+  STARTER_KIT
+  MODEL_PACK
+  VFX_PACK
+}
+
+enum OrderStatus {
+  COMPLETE
+  PROCESSING
+  REFUNDED
+}
+
+enum DownloadStatus {
+  PENDING
+  AVAILABLE
+  REVOKED
+}
+
+model Category {
+  id          String       @id @default(cuid())
+  name        String
+  slug        String       @unique
+  description String
+  icon        CategoryIcon
+  sortOrder   Int          @default(0)
+  createdAt   DateTime     @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime     @updatedAt @db.Timestamptz(3)
+
+  products Product[]
+
+  @@index([sortOrder, slug])
+}
+
+model Product {
+  id                   String      @id @default(cuid())
+  slug                 String      @unique
+  title                String
+  description          String
+  overview             String[]    @default([])
+  price                Decimal     @db.Decimal(10, 2)
+  type                 ProductType
+  version              String
+  features             String[]    @default([])
+  requirements         String[]    @default([])
+  includedFiles        String[]    @default([])
+  installation         String[]    @default([])
+  documentationSummary String
+  documentationTopics  String[]    @default([])
+  license              String
+  releasedAt           DateTime    @db.Date
+  isFeatured           Boolean     @default(false)
+  isNew                Boolean     @default(false)
+  published            Boolean     @default(false)
+  sortOrder            Int         @default(0)
+  categoryId           String
+  createdAt            DateTime    @default(now()) @db.Timestamptz(3)
+  updatedAt            DateTime    @updatedAt @db.Timestamptz(3)
+
+  category      Category                @relation(fields: [categoryId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  images        ProductImage[]
+  modelPreviews ProductModelPreview[]
+  changelog     ProductChangelogEntry[]
+  orderItems    OrderItem[]
+  downloads     Download[]
+
+  @@index([categoryId, published, sortOrder])
+  @@index([published, isFeatured, sortOrder])
+}
+
+model ProductImage {
+  id        String   @id @default(cuid())
+  productId String
+  src       String
+  altText   String?
+  position  Int      @default(0)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([productId, position])
+  @@index([productId])
+}
+
+model ProductModelPreview {
+  id          String   @id @default(cuid())
+  productId   String
+  src         String
+  label       String
+  description String
+  position    Int      @default(0)
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(3)
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([productId, position])
+  @@index([productId])
+}
+
+model ProductChangelogEntry {
+  id        String   @id @default(cuid())
+  productId String
+  version   String
+  date      DateTime @db.Date
+  notes     String
+  position  Int      @default(0)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([productId, position])
+  @@index([productId, date])
+}
+
+model Customer {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  orders    Order[]
+  downloads Download[]
+}
+
+model Order {
+  id         String      @id @default(cuid())
+  customerId String
+  status     OrderStatus
+  total      Decimal     @db.Decimal(10, 2)
+  currency   String      @default("USD") @db.VarChar(3)
+  createdAt  DateTime    @default(now()) @db.Timestamptz(3)
+  updatedAt  DateTime    @updatedAt @db.Timestamptz(3)
+
+  customer Customer    @relation(fields: [customerId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  items    OrderItem[]
+
+  @@index([customerId, createdAt])
+}
+
+model OrderItem {
+  id                String   @id @default(cuid())
+  orderId           String
+  productId         String
+  productTitle      String
+  productSlug       String
+  categorySlug      String
+  categoryName      String
+  versionAtPurchase String
+  unitPrice         Decimal  @db.Decimal(10, 2)
+  quantity          Int      @default(1)
+  position          Int      @default(0)
+  createdAt         DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime @updatedAt @db.Timestamptz(3)
+
+  order    Order     @relation(fields: [orderId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  product  Product   @relation(fields: [productId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  download Download?
+
+  @@unique([orderId, productId])
+  @@index([productId])
+}
+
+model Download {
+  id          String         @id @default(cuid())
+  customerId  String
+  productId   String
+  orderItemId String?        @unique
+  status      DownloadStatus @default(PENDING)
+  fileKey     String?
+  createdAt   DateTime       @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime       @updatedAt @db.Timestamptz(3)
+
+  customer  Customer   @relation(fields: [customerId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  product   Product    @relation(fields: [productId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  orderItem OrderItem? @relation(fields: [orderItemId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  @@index([customerId, createdAt])
+  @@index([productId])
+}

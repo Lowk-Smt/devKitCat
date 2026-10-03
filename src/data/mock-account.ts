@@ -1,13 +1,22 @@
 import { getCategoryBySlug } from "@/data/categories";
 import { products } from "@/data/products";
 import type { Product } from "@/types";
+import type {
+  DownloadStatus,
+  OrderStatus,
+  ResolvedDownload,
+  ResolvedOrder,
+  ResolvedOrderItem,
+} from "@/types/account";
 
 /**
- * Customer-area fixtures for the frontend milestone.
- * These records are local demo data only; they are not authenticated, paid,
- * persisted, or connected to file delivery.
+ * Customer-area demo fixtures for the frontend milestone and database seed.
+ * The account UI remains a fixed preview: these values do not represent an
+ * authenticated customer, paid order, or file-delivery permission.
  */
 export const mockCustomer = {
+  /** Stable demo fixture ID shared with the idempotent database seed. */
+  id: "demo-customer",
   name: "Jordan Taylor",
   email: "jordan.taylor@example.test",
   initials: "JT",
@@ -19,7 +28,7 @@ export const mockCustomer = {
   },
 } as const;
 
-export type MockOrderStatus = "complete" | "processing" | "refunded";
+export type MockOrderStatus = OrderStatus;
 
 export interface MockOrderItem {
   /** References `Product.id` in the existing marketplace catalog. */
@@ -91,7 +100,7 @@ export const mockOrders: readonly MockOrder[] = [
   },
 ];
 
-export type MockDownloadStatus = "coming-soon";
+export type MockDownloadStatus = DownloadStatus;
 
 export interface MockDownloadRecord {
   /** References `Product.id` in the existing marketplace catalog. */
@@ -111,24 +120,6 @@ export const mockDownloadRecords: readonly MockDownloadRecord[] = [
   { productId: "roblox-ui-starter-kit", status: "coming-soon" },
 ];
 
-export interface ResolvedOrderItem extends MockOrderItem {
-  product: Product;
-  categoryName: string;
-}
-
-export interface ResolvedOrder extends Omit<MockOrder, "items"> {
-  items: ResolvedOrderItem[];
-}
-
-export interface ResolvedDownload {
-  product: Product;
-  categoryName: string;
-  version: string;
-  fileCount: number;
-  lastUpdated: string;
-  status: MockDownloadStatus;
-}
-
 function resolveProduct(productId: Product["id"]): Product | undefined {
   return products.find((product) => product.id === productId);
 }
@@ -143,7 +134,7 @@ function resolveOrder(order: MockOrder): ResolvedOrder | undefined {
     items.push({ ...item, product, categoryName: category.name });
   }
 
-  return { ...order, items };
+  return { ...order, currency: "USD", items };
 }
 
 /** Read-only presentation of the centralized demo order fixtures. */

@@ -1,8 +1,8 @@
 import type { Category } from "@/types";
 
 /**
- * The eight product categories for the marketplace.
- * Static mock data — no backend persistence in this PR.
+ * The eight seeded category fixtures and database-free demo fallback.
+ * Configured marketplace routes read persisted category records server-side.
  */
 export const categories = [
   {
