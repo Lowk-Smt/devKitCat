@@ -1,0 +1,21 @@
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.error {
+  padding: 0.7rem 0.8rem;
+  border: 1px solid rgba(255, 138, 138, 0.35);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 138, 138, 0.09);
+  color: #ffb4b4;
+  font-size: 0.83rem;
+  line-height: 1.5;
+}
+
+.hint {
+  color: var(--text-faint);
+  font-size: 0.78rem;
+  line-height: 1.5;
+}

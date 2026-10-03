@@ -1,3 +1,18 @@
+import type { OrderStatus } from "@/types/account";
+
+/**
+ * True for an order that checkout submitted but no payment has settled.
+ *
+ * Payment processing is not part of devKitCat yet, so an unpaid order carries no
+ * payment record and unlocks nothing: the download controls stay disabled
+ * placeholders and the order is never described as a completed purchase.
+ */
+export function isUnpaidOrderStatus(
+  status: OrderStatus,
+): status is "pending-payment" {
+  return status === "pending-payment";
+}
+
 export type AccountCollectionPreviewState =
   | "populated"
   | "empty"

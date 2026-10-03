@@ -12,12 +12,17 @@ interface ProductPurchasePanelProps {
 }
 
 /**
- * Price + purchase actions. UI only: "Buy now" adds the product to the cart and
- * opens it for review; there is no checkout or payment in this release.
+ * Price + purchase actions.
+ *
+ * "Buy now" adds the product to the cart and opens it for review; "Add to cart"
+ * does the same without opening it. For a signed-in customer that writes a
+ * database cart line (adding again raises its quantity), and checkout happens on
+ * `/checkout`. No payment provider is connected, so nothing is charged here.
  */
 export function ProductPurchasePanel({ product }: ProductPurchasePanelProps) {
-  const { has, add, remove, open } = useCart();
+  const { has, quantityOf, add, remove, open, isPending } = useCart();
   const inCart = has(product.id);
+  const quantity = quantityOf(product.id);
 
   return (
     <div className={styles.panel}>
@@ -26,6 +31,7 @@ export function ProductPurchasePanel({ product }: ProductPurchasePanelProps) {
       <div className={styles.actions}>
         <Button
           fullWidth
+          disabled={isPending}
           onClick={() => {
             add(product.id);
             open();
@@ -34,12 +40,19 @@ export function ProductPurchasePanel({ product }: ProductPurchasePanelProps) {
           Buy now
         </Button>
         {inCart ? (
-          <Button variant="secondary" fullWidth onClick={open}>
+          <Button variant="secondary" fullWidth onClick={open} disabled={isPending}>
             <Icon name="check" size={16} />
-            Added to cart — view cart
+            {quantity > 1
+              ? `${quantity} in cart — view cart`
+              : "Added to cart — view cart"}
           </Button>
         ) : (
-          <Button variant="secondary" fullWidth onClick={() => add(product.id)}>
+          <Button
+            variant="secondary"
+            fullWidth
+            onClick={() => add(product.id)}
+            disabled={isPending}
+          >
             <Icon name="cart" size={16} />
             Add to cart
           </Button>
@@ -49,6 +62,7 @@ export function ProductPurchasePanel({ product }: ProductPurchasePanelProps) {
             type="button"
             className={styles.remove}
             onClick={() => remove(product.id)}
+            disabled={isPending}
           >
             Remove from cart
           </button>
@@ -56,8 +70,9 @@ export function ProductPurchasePanel({ product }: ProductPurchasePanelProps) {
       </div>
 
       <p className={styles.note}>
-        Checkout isn&apos;t available yet. “Buy now” adds this item to your cart
-        so you can review it — nothing is purchased or charged.
+        Payment is not connected to devKitCat yet, so nothing is charged at
+        checkout. “Buy now” adds this item to your cart so you can review the
+        order first.
       </p>
 
       <p className="sr-only" role="status">

@@ -1,11 +1,13 @@
 import { OrderStatus } from "@/components/account/OrderStatus";
 import { Button } from "@/components/ui/Button";
+import { isUnpaidOrderStatus } from "@/lib/account-presentation";
 import { formatDate, formatPrice } from "@/lib/catalog";
 import type { ResolvedOrder } from "@/types/account";
 import styles from "@/components/account/AccountPage.module.css";
 
 export function OrderSummary({ order }: { order: ResolvedOrder }) {
   const quantity = order.items.reduce((sum, item) => sum + item.quantity, 0);
+  const unpaid = isUnpaidOrderStatus(order.status);
 
   return (
     <aside className={styles.summaryCard} aria-label="Order summary">
@@ -38,12 +40,13 @@ export function OrderSummary({ order }: { order: ResolvedOrder }) {
       </dl>
 
       <p className={styles.summaryTotal}>
-        <span>Total</span>
+        <span>{unpaid ? "Order total" : "Total"}</span>
         <strong>{formatPrice(order.total)}</strong>
       </p>
       <p className={styles.summaryNote}>
-        Checkout is not part of devKitCat yet, so this order carries no payment
-        record.
+        {unpaid
+          ? "This order is awaiting payment: payment processing is not connected to devKitCat yet, so nothing has been charged, no payment record exists, and no download has been unlocked."
+          : "Payment processing is not connected to devKitCat yet, so this order carries no payment record."}
       </p>
       <Button href="/account/downloads" variant="secondary" fullWidth>
         Go to downloads

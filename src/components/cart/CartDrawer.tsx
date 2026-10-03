@@ -8,16 +8,33 @@ import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Icon } from "@/components/ui/Icon";
 import { formatPrice } from "@/lib/catalog";
+import { CART_CURRENCY, CART_ITEM_MAX_QUANTITY } from "@/lib/cart-contract";
+import { priceCentsToAmount } from "@/lib/money";
 import styles from "./CartDrawer.module.css";
 
 /**
  * Cart side panel built on a native modal <dialog>, which provides focus
  * trapping, Escape-to-close, an inert background, and focus restoration.
- * UI only: there is no checkout — the checkout button is intentionally inert.
+ *
+ * Review only — nothing is charged here. For a signed-in customer the lines are
+ * their database cart and the button goes to `/checkout`; for a signed-out
+ * visitor the lines are browser-local and the button goes to sign-in, because a
+ * cart cannot be ordered without an account.
  */
 export function CartDrawer() {
-  const { items, itemCount, subtotal, isOpen, remove, clear, close } =
-    useCart();
+  const {
+    lines,
+    itemCount,
+    subtotalCents,
+    isOpen,
+    isAuthenticated,
+    isPending,
+    notice,
+    setQuantity,
+    remove,
+    clear,
+    close,
+  } = useCart();
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleRef = useRef<HTMLHeadingElement>(null);
 
@@ -77,6 +94,12 @@ export function CartDrawer() {
           </button>
         </header>
 
+        {notice ? (
+          <p className={styles.notice} role="alert">
+            {notice}
+          </p>
+        ) : null}
+
         {itemCount === 0 ? (
           <div className={styles.emptyWrap}>
             <EmptyState
@@ -94,10 +117,15 @@ export function CartDrawer() {
         ) : (
           <>
             <ul className={styles.list} aria-label="Items in your cart">
-              {items.map((product) => (
+              {lines.map((line) => (
                 <CartItem
-                  key={product.id}
-                  product={product}
+                  key={line.productId}
+                  line={line}
+                  maxQuantity={CART_ITEM_MAX_QUANTITY}
+                  busy={isPending}
+                  onQuantityChange={
+                    isAuthenticated === true ? withFocusReset(setQuantity) : undefined
+                  }
                   onRemove={withFocusReset(remove)}
                   onNavigate={close}
                 />
@@ -112,16 +140,29 @@ export function CartDrawer() {
                 </div>
                 <div className={styles.summaryTotal}>
                   <dt>Subtotal</dt>
-                  <dd>{formatPrice(subtotal)}</dd>
+                  <dd>{formatPrice(priceCentsToAmount(subtotalCents))}</dd>
                 </div>
               </dl>
               <p className={styles.note}>
-                Checkout isn&apos;t available yet. Your cart is saved on this
-                device only, and nothing has been purchased or charged.
+                {isAuthenticated === true
+                  ? "Your cart is saved to your devKitCat account. Nothing has been purchased or charged — payment is not connected yet."
+                  : "Your cart is saved on this device only, and nothing has been purchased or charged. Sign in to check out."}
               </p>
-              <Button fullWidth disabled>
-                Checkout coming soon
-              </Button>
+
+              {isAuthenticated === true ? (
+                <Button href="/checkout" fullWidth disabled={isPending}>
+                  Review &amp; checkout
+                </Button>
+              ) : isAuthenticated === false ? (
+                <Button href="/login" fullWidth>
+                  Sign in to check out
+                </Button>
+              ) : (
+                <Button fullWidth disabled aria-busy="true">
+                  Checking your cart…
+                </Button>
+              )}
+
               <div className={styles.secondary}>
                 <Link
                   href="/products"
@@ -134,10 +175,15 @@ export function CartDrawer() {
                   type="button"
                   className={styles.textAction}
                   onClick={withFocusReset(clear)}
+                  disabled={isPending}
                 >
                   Clear cart
                 </button>
               </div>
+              <p className={styles.currency}>
+                Prices in {CART_CURRENCY}. Final payment calculations arrive with
+                the payment integration.
+              </p>
             </footer>
           </>
         )}
