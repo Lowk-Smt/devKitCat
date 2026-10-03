@@ -97,6 +97,7 @@ const demoCustomerRow = {
   updatedAt: new Date("2025-11-08T00:00:00.000Z"),
 };
 
+
 const demoOrderRow = {
   id: "DKC-2026-0918-10482",
   customerId: demoCustomerRow.id,
@@ -123,6 +124,12 @@ const demoOrderRow = {
   ],
 };
 
+const strangerOrderRow = {
+  ...demoOrderRow,
+  id: "DKC-2026-0701-09111",
+  customerId: "another-customer",
+};
+
 const demoDownloadRow = {
   id: "download-1",
   customerId: demoCustomerRow.id,
@@ -137,13 +144,7 @@ const demoDownloadRow = {
 };
 
 function makeFallback() {
-  return {
-    products: [],
-    categories: [],
-    customers: [],
-    orders: [],
-    downloads: [],
-  };
+  return { products: [], categories: [] };
 }
 
 function makeDatabaseClient() {
@@ -169,24 +170,20 @@ function makeDatabaseClient() {
         return [demoProduct.category, secondProduct.category];
       },
     },
-    customer: {
-      async findUnique(args) {
-        calls.push(["customer.findUnique", args]);
-        return Object.entries(args.where).every(
-          ([key, value]) => demoCustomerRow[key] === value,
-        )
-          ? demoCustomerRow
-          : null;
-      },
-    },
     order: {
       async findMany(args) {
         calls.push(["order.findMany", args]);
-        return args.where.customerId === demoOrderRow.customerId ? [demoOrderRow] : [];
+        return [demoOrderRow, strangerOrderRow].filter(
+          (order) => order.customerId === args.where.customerId,
+        );
       },
-      async findUnique(args) {
-        calls.push(["order.findUnique", args]);
-        return args.where.id === demoOrderRow.id ? demoOrderRow : null;
+      async findFirst(args) {
+        calls.push(["order.findFirst", args]);
+        return (
+          [demoOrderRow, strangerOrderRow].find((order) =>
+            Object.entries(args.where).every(([key, value]) => order[key] === value),
+          ) ?? null
+        );
       },
     },
     download: {
@@ -363,7 +360,7 @@ test("seed runner upserts stable records and is safe to execute repeatedly", asy
   );
 });
 
-test("database reads map product, media, category, customer, order and download records", async () => {
+test("database reads map product, media, category, order and download records", async () => {
   const { client, calls } = makeDatabaseClient();
   const data = createMarketplaceDataAccess(() => client, makeFallback(), () => {});
 
@@ -382,8 +379,6 @@ test("database reads map product, media, category, customer, order and download 
 
   const categories = await data.listCategories();
   assert.deepEqual(categories.map((category) => category.icon), ["systems", "vfx"]);
-  assert.equal((await data.getCustomerByEmail(" JORDAN.TAYLOR@EXAMPLE.TEST ")).name, "Jordan Taylor");
-  assert.equal((await data.getCustomerById("demo-customer")).email, "jordan.taylor@example.test");
 
   const orders = await data.listCustomerOrders("demo-customer");
   assert.equal(orders.length, 1);
@@ -392,8 +387,11 @@ test("database reads map product, media, category, customer, order and download 
   assert.equal(orders[0].items[0].price, 14.99);
   assert.equal(orders[0].items[0].version, "1.4.2");
   assert.equal(orders[0].items[0].product.title, "ProSave — DataStore System");
-  assert.equal((await data.getOrderById(demoOrderRow.id)).id, demoOrderRow.id);
-  assert.equal(await data.getOrderById("missing"), undefined);
+  assert.equal(
+    (await data.getCustomerOrderById("demo-customer", demoOrderRow.id)).id,
+    demoOrderRow.id,
+  );
+  assert.equal(await data.getCustomerOrderById("demo-customer", "missing"), undefined);
 
   const downloads = await data.listCustomerDownloads("demo-customer");
   assert.equal(downloads.length, 1);
@@ -406,6 +404,32 @@ test("database reads map product, media, category, customer, order and download 
   const related = await data.getRelatedProducts({ id: "prosave", category: "systems" }, 1);
   assert.equal(related.items[0].id, "vfx-starter-pack");
   assert.equal(related.sameCategory, false);
+});
+
+test("order reads are owned by the authenticated customer, not by the URL ID", async () => {
+  const { client, calls } = makeDatabaseClient();
+  const data = createMarketplaceDataAccess(() => client, makeFallback(), () => {});
+
+  // The signed-in customer sees only their own orders.
+  assert.deepEqual(
+    (await data.listCustomerOrders("demo-customer")).map((order) => order.id),
+    [demoOrderRow.id],
+  );
+  assert.deepEqual(
+    (await data.listCustomerOrders("another-customer")).map((order) => order.id),
+    [strangerOrderRow.id],
+  );
+
+  // Editing the order ID in the URL cannot reach somebody else's purchase.
+  assert.equal(await data.getCustomerOrderById("demo-customer", strangerOrderRow.id), undefined);
+  assert.equal(
+    (await data.getCustomerOrderById("another-customer", strangerOrderRow.id)).id,
+    strangerOrderRow.id,
+  );
+
+  // Ownership is part of the query itself, never a filter applied afterwards.
+  const scoped = calls.filter(([name]) => name === "order.findFirst").pop();
+  assert.deepEqual(Object.keys(scoped[1].where).sort(), ["customerId", "id"]);
 });
 
 test("catalog search uses category records returned by the database", () => {
@@ -431,18 +455,16 @@ test("missing DATABASE_URL selects fixtures; database errors stay generic", asyn
   const fallback = {
     products: [demoProduct],
     categories: [demoProduct.category],
-    customers: [demoCustomerRow],
-    orders: [{ customerId: "demo-customer", order: { ...mapOrderFixture() } }],
-    downloads: [{ customerId: "demo-customer", download: { ...mapDownloadFixture() } }],
   };
   const fallbackData = createMarketplaceDataAccess(() => null, fallback, () => {});
   assert.equal((await fallbackData.listProducts())[0].id, "prosave");
   assert.equal((await fallbackData.getProductBySlug("prosave")).id, "prosave");
   assert.equal((await fallbackData.listCategories()).length, 1);
-  assert.equal((await fallbackData.getCustomerByEmail(demoCustomerRow.email)).id, "demo-customer");
-  assert.equal((await fallbackData.listCustomerOrders("demo-customer")).length, 1);
-  assert.equal((await fallbackData.getOrderById(demoOrderRow.id)).id, demoOrderRow.id);
-  assert.equal((await fallbackData.listCustomerDownloads("demo-customer")).length, 1);
+  // Account data has no offline fixture: without a database there is no session
+  // to verify, so these stay empty instead of serving demo purchase records.
+  assert.deepEqual(await fallbackData.listCustomerOrders("demo-customer"), []);
+  assert.equal(await fallbackData.getCustomerOrderById("demo-customer", demoOrderRow.id), undefined);
+  assert.deepEqual(await fallbackData.listCustomerDownloads("demo-customer"), []);
 
   const log = [];
   const broken = makeDatabaseClient().client;
@@ -459,56 +481,3 @@ test("missing DATABASE_URL selects fixtures; database errors stay generic", asyn
   });
   assert.deepEqual(log, [{ resource: "products", code: "P1001" }]);
 });
-
-function mapOrderFixture() {
-  return {
-    id: demoOrderRow.id,
-    date: "2026-09-18",
-    status: "complete",
-    total: 23.98,
-    currency: "USD",
-    items: [
-      {
-        productId: "prosave",
-        version: "1.4.2",
-        price: 14.99,
-        quantity: 1,
-        product: {
-          id: "prosave",
-          slug: "prosave",
-          title: "ProSave — DataStore System",
-          description: "Persistent player data with retries and session locking.",
-          overview: ["A reliable player-data layer."],
-          category: "systems",
-          price: 14.99,
-          images: ["/prosave.png"],
-          modelPreviews: [],
-          type: "system",
-          version: "1.4.2",
-          features: ["Session locking"],
-          requirements: ["Roblox Studio"],
-          includedFiles: ["ProSave.rbxm", "Documentation.md"],
-          installation: ["Import the module."],
-          documentation: { summary: "Setup and API documentation.", topics: ["Quick start"] },
-          changelog: [{ version: "1.4.2", date: "2026-08-14", notes: "Improved save retries." }],
-          license: "devKitCat Standard License",
-          releasedAt: "2026-03-12",
-          isFeatured: true,
-          isNew: false,
-        },
-        categoryName: "Systems",
-      },
-    ],
-  };
-}
-
-function mapDownloadFixture() {
-  return {
-    product: mapOrderFixture().items[0].product,
-    categoryName: "Systems",
-    version: "1.4.2",
-    fileCount: 2,
-    lastUpdated: "2026-08-14",
-    status: "coming-soon",
-  };
-}

@@ -6,11 +6,12 @@ import { PurchaseCard } from "@/components/account/PurchaseCard";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Icon } from "@/components/ui/Icon";
-import { getMockOrders } from "@/data/mock-account";
 import {
   firstSearchParam,
   parseAccountCollectionPreviewState,
 } from "@/lib/account-presentation";
+import { requireCustomer } from "@/lib/server/auth";
+import { listCustomerOrders } from "@/lib/server/data-access";
 import styles from "@/components/account/AccountPage.module.css";
 
 export const metadata = {
@@ -20,11 +21,13 @@ export const metadata = {
 export default async function PurchasesPage({
   searchParams,
 }: PageProps<"/account/purchases">) {
+  const customer = await requireCustomer();
   const params = await searchParams;
   const previewState = parseAccountCollectionPreviewState(params.preview);
   const query = (firstSearchParam(params.q) ?? "").trim().slice(0, 120);
   const normalizedQuery = query.toLocaleLowerCase("en-US");
-  const orders = getMockOrders();
+  // Scoped to the signed-in customer: another account's orders are unreachable.
+  const orders = await listCustomerOrders(customer.id);
   const matchingOrders = normalizedQuery
     ? orders.filter((order) =>
         [
@@ -46,12 +49,12 @@ export default async function PurchasesPage({
       <AccountPageHeader
         eyebrow="Your account"
         title="Purchases"
-        description="Review the products and order details in your demo purchase history."
+        description="Review the products and order details in your purchase history."
       />
 
       <AccountSection
         title="Purchase history"
-        description="Order records are local mock data and are not connected to payment processing."
+        description="Order records come from your devKitCat account and are not connected to payment processing yet."
       >
         <form action="/account/purchases" method="get" className={styles.searchForm}>
           <label className="sr-only" htmlFor="purchase-search">
@@ -114,7 +117,7 @@ export default async function PurchasesPage({
           <EmptyState
             icon="search"
             title="No matching orders"
-            description={`No demo orders match “${query}”. Try another order ID, product name, or category.`}
+            description={`No orders match “${query}”. Try another order ID, product name, or category.`}
             action={
               <Link className={styles.inlineLink} href="/account/purchases">
                 Clear search <Icon name="arrow-right" size={15} />

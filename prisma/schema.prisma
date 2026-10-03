@@ -38,6 +38,11 @@ enum DownloadStatus {
   REVOKED
 }
 
+enum ThemePreference {
+  DARK
+  SYSTEM
+}
+
 model Category {
   id          String       @id @default(cuid())
   name        String
@@ -137,14 +142,38 @@ model ProductChangelogEntry {
 }
 
 model Customer {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String
-  createdAt DateTime @default(now()) @db.Timestamptz(3)
-  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+  id              String          @id @default(cuid())
+  email           String          @unique
+  name            String
+  /// scrypt password digest. Null means the record cannot sign in (for example
+  /// the seeded marketplace fixture customer, which is data-only).
+  passwordHash    String?
+  /// Profile preferences edited on /account/settings.
+  themePreference ThemePreference @default(DARK)
+  productUpdates  Boolean         @default(true)
+  releaseNotes    Boolean         @default(false)
+  createdAt       DateTime        @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime        @updatedAt @db.Timestamptz(3)
 
   orders    Order[]
   downloads Download[]
+  sessions  Session[]
+}
+
+/// Server-side session records. Only the SHA-256 hash of the opaque cookie
+/// token is stored, so a database leak cannot be replayed as a session.
+model Session {
+  id         String   @id @default(cuid())
+  tokenHash  String   @unique
+  customerId String
+  expiresAt  DateTime @db.Timestamptz(3)
+  createdAt  DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt  DateTime @updatedAt @db.Timestamptz(3)
+
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([customerId])
+  @@index([expiresAt])
 }
 
 model Order {

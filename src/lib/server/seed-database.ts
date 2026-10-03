@@ -5,9 +5,11 @@ import type {
   OrderStatus as PrismaOrderStatus,
   PrismaClient,
   ProductType as PrismaProductType,
+  ThemePreference as PrismaThemePreference,
 } from "@/generated/prisma/client";
 import type { MockOrderStatus } from "@/data/mock-account";
 import type { Product } from "@/types";
+import type { CustomerPreferences as SeedCustomerPreferences } from "@/types/account";
 import {
   buildMarketplaceSeedData,
   type MarketplaceSeedData,
@@ -40,6 +42,14 @@ const ORDER_STATUS_MAP: Record<MockOrderStatus, PrismaOrderStatus> = {
 };
 
 const PENDING_DOWNLOAD: PrismaDownloadStatus = "PENDING";
+
+const THEME_PREFERENCE_MAP: Record<
+  SeedCustomerPreferences["theme"],
+  PrismaThemePreference
+> = {
+  dark: "DARK",
+  system: "SYSTEM",
+};
 
 function categoryIcon(icon: string): PrismaCategoryIcon {
   const mapped = CATEGORY_ICON_MAP[icon];
@@ -157,12 +167,17 @@ export async function seedMarketplace(
       }
     }
 
+    // No passwordHash is written: the fixture customer stays signed-out-only,
+    // and re-seeding must never overwrite a real credential.
     const customer = await tx.customer.upsert({
       where: { email: data.customer.email },
       create: {
         id: data.customer.id,
         email: data.customer.email,
         name: data.customer.name,
+        themePreference: THEME_PREFERENCE_MAP[data.customer.preferences.theme],
+        productUpdates: data.customer.preferences.productUpdates,
+        releaseNotes: data.customer.preferences.releaseNotes,
         createdAt: data.customer.createdAt,
       },
       update: { name: data.customer.name },

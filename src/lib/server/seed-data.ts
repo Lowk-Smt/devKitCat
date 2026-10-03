@@ -6,6 +6,7 @@ import {
 } from "@/data/mock-account";
 import { products } from "@/data/products";
 import type { Category, Product } from "@/types";
+import type { CustomerPreferences } from "@/types/account";
 import type { MockOrderStatus } from "@/data/mock-account";
 
 export interface SeedCategory {
@@ -58,10 +59,15 @@ export interface SeedDownload {
 }
 
 export interface MarketplaceSeedData {
+  /**
+   * Sample customer for the seeded order/download records. It deliberately has
+   * no password, so it cannot sign in; register an account to use `/account`.
+   */
   customer: {
     id: string;
     email: string;
     name: string;
+    preferences: CustomerPreferences;
     createdAt: Date;
   };
   categories: SeedCategory[];
@@ -169,6 +175,7 @@ export function buildMarketplaceSeedData(): MarketplaceSeedData {
       id: mockCustomer.id,
       email: mockCustomer.email,
       name: mockCustomer.name,
+      preferences: mockCustomer.preferences,
       createdAt: atUtcMidnight(mockCustomer.memberSince),
     },
     categories: seedCategories,

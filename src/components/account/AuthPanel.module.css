@@ -107,7 +107,57 @@
   color: var(--accent-strong);
 }
 
-.previewNote {
+.formColumn {
+  display: grid;
+  min-width: 0;
+  gap: 0.9rem;
+}
+
+.notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.7rem;
+  padding: 0.8rem 0.9rem;
+  border: 1px solid rgba(93, 125, 249, 0.24);
+  border-radius: var(--radius-md);
+  background: linear-gradient(100deg, rgba(93, 125, 249, 0.09), rgba(93, 125, 249, 0.03));
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+.notice svg {
+  flex: 0 0 auto;
+  margin-top: 0.1rem;
+  color: var(--accent-strong);
+}
+
+.notice p {
+  display: grid;
+  min-width: 0;
+  gap: 0.2rem;
+}
+
+.notice strong {
+  color: #c8d2ff;
+  font-size: 0.8rem;
+  font-weight: 640;
+}
+
+.noticeWarning {
+  border-color: rgba(255, 176, 92, 0.3);
+  background: linear-gradient(100deg, rgba(255, 176, 92, 0.09), rgba(255, 176, 92, 0.03));
+}
+
+.noticeWarning svg {
+  color: #ffb05c;
+}
+
+.noticeWarning strong {
+  color: #ffd7a8;
+}
+
+.statusNote {
   display: flex;
   align-items: flex-start;
   gap: 0.65rem;
@@ -117,7 +167,7 @@
   border-top: 1px solid var(--border);
 }
 
-.previewDot {
+.statusDot {
   flex: 0 0 auto;
   width: 0.45rem;
   height: 0.45rem;
@@ -127,7 +177,7 @@
   box-shadow: 0 0 0 4px var(--accent-faint);
 }
 
-.previewNote p {
+.statusNote p {
   display: grid;
   gap: 0.2rem;
   color: var(--text-faint);
@@ -135,7 +185,7 @@
   line-height: 1.45;
 }
 
-.previewNote strong {
+.statusNote strong {
   color: var(--text-muted);
   font-size: 0.75rem;
   font-weight: 600;
@@ -181,7 +231,7 @@
     font-size: 0.7rem;
   }
 
-  .previewNote {
+  .statusNote {
     margin-top: 1.25rem;
   }
 }

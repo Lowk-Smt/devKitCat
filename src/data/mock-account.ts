@@ -1,26 +1,21 @@
-import { getCategoryBySlug } from "@/data/categories";
-import { products } from "@/data/products";
 import type { Product } from "@/types";
-import type {
-  DownloadStatus,
-  OrderStatus,
-  ResolvedDownload,
-  ResolvedOrder,
-  ResolvedOrderItem,
-} from "@/types/account";
+import type { DownloadStatus, OrderStatus } from "@/types/account";
 
 /**
- * Customer-area demo fixtures for the frontend milestone and database seed.
- * The account UI remains a fixed preview: these values do not represent an
- * authenticated customer, paid order, or file-delivery permission.
+ * Marketplace demo fixtures used as the deterministic database seed input.
+ *
+ * These records are sample catalog data, not an account experience: the
+ * customer below has no password, so it cannot sign in, and no screen reads
+ * these values directly any more. Account pages render the authenticated
+ * `Customer` and its own orders/downloads instead.
  */
 export const mockCustomer = {
   /** Stable demo fixture ID shared with the idempotent database seed. */
   id: "demo-customer",
   name: "Jordan Taylor",
   email: "jordan.taylor@example.test",
-  initials: "JT",
   memberSince: "2025-11-08",
+  /** Seeded onto the fixture customer so stored preferences are reproducible. */
   preferences: {
     theme: "dark",
     productUpdates: true,
@@ -119,67 +114,3 @@ export const mockDownloadRecords: readonly MockDownloadRecord[] = [
   { productId: "camping-props-pack", status: "coming-soon" },
   { productId: "roblox-ui-starter-kit", status: "coming-soon" },
 ];
-
-function resolveProduct(productId: Product["id"]): Product | undefined {
-  return products.find((product) => product.id === productId);
-}
-
-function resolveOrder(order: MockOrder): ResolvedOrder | undefined {
-  const items: ResolvedOrderItem[] = [];
-
-  for (const item of order.items) {
-    const product = resolveProduct(item.productId);
-    const category = product ? getCategoryBySlug(product.category) : undefined;
-    if (!product || !category) return undefined;
-    items.push({ ...item, product, categoryName: category.name });
-  }
-
-  return { ...order, currency: "USD", items };
-}
-
-/** Read-only presentation of the centralized demo order fixtures. */
-export function getMockOrders(): ResolvedOrder[] {
-  return mockOrders.flatMap((order) => {
-    const resolved = resolveOrder(order);
-    return resolved ? [resolved] : [];
-  });
-}
-
-/** Returns undefined for an unknown ID or an invalid catalog reference. */
-export function getMockOrderById(orderId: string): ResolvedOrder | undefined {
-  const order = mockOrders.find((entry) => entry.id === orderId);
-  return order ? resolveOrder(order) : undefined;
-}
-
-/**
- * Builds the download-library view from product IDs and the existing catalog.
- * Title, category, version, file count, and last-updated date are not copied
- * into a second product catalogue.
- */
-export function getMockDownloads(): ResolvedDownload[] {
-  return mockDownloadRecords.flatMap((record) => {
-    const product = resolveProduct(record.productId);
-    const category = product ? getCategoryBySlug(product.category) : undefined;
-    if (!product || !category) return [];
-
-    return [
-      {
-        product,
-        categoryName: category.name,
-        version: product.version,
-        fileCount: product.includedFiles.length,
-        lastUpdated: product.changelog[0]?.date ?? product.releasedAt,
-        status: record.status,
-      },
-    ];
-  });
-}
-
-/**
- * Presentation-only session fixture. This value is intentionally fixed and
- * has no login, logout, storage, token, or access-control behavior.
- */
-export const mockAccountPresentation = {
-  status: "demo-signed-in" as const,
-  customer: mockCustomer,
-};

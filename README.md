@@ -9,30 +9,45 @@ tools, templates, and complete starter kits.
 ## Status
 
 PRs #1 (marketplace foundation/design system), #2 (browsing/search/product
-pages/cart UI), #3 (Three.js previews), and #4 (customer/account UI) are merged.
-This branch contains the completed implementation for **PR #5 — PostgreSQL +
-Prisma backend/database foundation** and is ready for review; PR #5 is not yet merged:
+pages/cart UI), #3 (Three.js previews), #4 (customer/account UI), and #5
+(PostgreSQL + Prisma backend/database foundation) are merged. This branch
+contains the completed implementation for **PR #6 — authentication and customer
+accounts** and is ready for review; PR #6 is not yet merged:
 
+- `/login` and `/register` are wired to a real backend. Registration creates a
+  `Customer` row with a scrypt password digest; sign-in verifies it and issues an
+  opaque session token whose SHA-256 hash is stored in a new `Session` table.
+  Sign-out deletes that row, so a copied token stops working immediately.
+- `/account`, `/account/purchases`, `/account/purchases/:id`,
+  `/account/downloads`, and `/account/settings` require an authenticated
+  customer and redirect everyone else to `/login`.
+- Account screens are database-backed and scoped to the authenticated customer:
+  orders, download records, and preferences are read by that customer's ID, so
+  another customer's order ID resolves to a 404 instead of their data. Their
+  layout, collection states, and styling are unchanged.
 - `/` and the marketplace/product routes read products and categories through a
   server-only data-access layer when `DATABASE_URL` is configured. Without it,
   the existing catalog fixtures remain a database-free preview fallback.
 - The marketplace UI remains client-interactive: search, category filters,
   sorting, result counts, cards, product detail, related products, galleries,
   and 3D previews keep their existing component contracts.
-- A normalized initial schema, migration, and repeatable seed cover products,
-  categories, the demo customer, its historical orders/items, and download
-  records.
-- Customer account screens remain the intentional PR #4 frontend demo. Their
-  displayed identity, purchases, and downloads are still fixed fixtures; the
-  database model/read layer does not authenticate visitors or protect routes.
 - The client-side **cart UI** remains local-only (`localStorage`) and has no
-  checkout or payment behavior.
+  checkout or payment behavior. Download buttons remain disabled placeholders;
+  secure paid-file delivery is a future PR.
 
-Not yet implemented (left for future PRs): authentication/session management,
-password handling, protected routes, payments/checkout, secure downloads, admin
-tooling, real production product imagery, reviews, and online documentation
-pages. See [`docs/pr-5-backend-database.md`](docs/pr-5-backend-database.md) for
-local database and deployment setup.
+Account routes deliberately have **no** fixture fallback: without
+`DATABASE_URL`, `/login` and `/register` report that account services are
+unavailable and the protected routes redirect, so no demo identity is ever
+rendered as if it were signed in.
+
+Not yet implemented (left for future PRs): payments/checkout, secure downloads,
+email verification, password reset, login rate limiting, OAuth/social sign-in,
+admin and seller tooling, real production product imagery, reviews, and online
+documentation pages. See
+[`docs/pr-6-authentication.md`](docs/pr-6-authentication.md) for the
+authentication architecture and
+[`docs/pr-5-backend-database.md`](docs/pr-5-backend-database.md) for local
+database and deployment setup.
 
 ## Tech stack
 
@@ -40,6 +55,7 @@ local database and deployment setup.
 - TypeScript
 - PostgreSQL + Prisma ORM 7 (PostgreSQL driver adapter)
 - [Three.js](https://threejs.org) + GLTFLoader / OrbitControls (no React 3D framework)
+- Node `crypto` scrypt + database-backed sessions for auth (no auth dependency)
 - ESLint (`eslint-config-next`)
 - Plain CSS — global design tokens + CSS Modules (no UI framework)
 - [Geist](https://vercel.com/font) fonts, self-hosted via the `geist` package
@@ -48,10 +64,10 @@ local database and deployment setup.
 
 ```bash
 npm ci
-# Database-free frontend preview:
+# Database-free catalog preview (account routes report themselves unavailable):
 npm run dev
 
-# To use PostgreSQL-backed marketplace reads:
+# To use PostgreSQL-backed marketplace reads and customer accounts:
 cp .env.example .env
 # Edit .env and replace the placeholder DATABASE_URL.
 npm run db:generate
@@ -60,10 +76,12 @@ npm run db:seed
 npm run dev
 ```
 
-The app can still run without `DATABASE_URL`; marketplace reads then use the
-existing demo fixtures. Migrations and seeding require a reachable PostgreSQL
-database. See the [backend/database guide](docs/pr-5-backend-database.md) for
-exact setup details.
+Marketplace reads still work without `DATABASE_URL` — they fall back to the
+catalog fixtures. Authentication does not: account services report themselves
+unavailable until PostgreSQL is reachable, migrated, and seeded. See the
+[backend/database guide](docs/pr-5-backend-database.md) for exact setup details
+and [`docs/pr-6-authentication.md`](docs/pr-6-authentication.md) for the
+authentication design.
 
 Open [http://localhost:3000](http://localhost:3000).
 
@@ -76,7 +94,7 @@ Open [http://localhost:3000](http://localhost:3000).
 | `npm run start`                 | Serve the production build                                         |
 | `npm run lint`                  | Run ESLint                                                         |
 | `npm run typecheck`             | Generate Prisma Client and run TypeScript checks without emitting |
-| `npm test`                      | Run existing UI tests plus seed/data-access unit tests             |
+| `npm test`                      | Run UI, authentication, and seed/data-access unit tests            |
 | `npm run db:generate`           | Generate Prisma Client (does not connect to PostgreSQL)            |
 | `npm run db:migrate`            | Apply/create development migrations; requires `DATABASE_URL`       |
 | `npm run db:deploy`             | Apply committed migrations in deployment environments              |
@@ -90,34 +108,34 @@ Open [http://localhost:3000](http://localhost:3000).
 | `/`                | Homepage                                           |
 | `/products`        | Marketplace (`?q=`, `?category=`, `?sort=` — all optional, combinable) |
 | `/products/:slug`  | Product detail (known demo slugs are predeclared; configured DB slugs are read at request time, unknown slugs 404) |
-| `/login`            | Sign-in UI preview; no authentication or credential handling |
-| `/register`         | Registration UI preview; no account creation |
-| `/account`          | Demo customer overview |
-| `/account/purchases` | Demo order history and search |
-| `/account/purchases/:id` | Demo order details (404 for unknown IDs) |
-| `/account/downloads` | Demo library; download controls are disabled placeholders |
-| `/account/settings` | Presentational profile and preference controls |
+| `/login`            | Sign in with email and password (signed-in visitors go to `/account`) |
+| `/register`         | Create an account and sign in; duplicate emails and invalid input are rejected |
+| `/account`          | Signed-in customer overview |
+| `/account/purchases` | The customer's own order history and search |
+| `/account/purchases/:id` | The customer's own order details (404 for unknown or unowned IDs) |
+| `/account/downloads` | The customer's own library; download controls are disabled placeholders |
+| `/account/settings` | Profile and preferences, persisted for the signed-in customer |
 
 ## Project structure
 
 ```
 prisma/
-├── schema.prisma          # PostgreSQL marketplace/account data model
-├── migrations/            # Initial reproducible schema migration
+├── schema.prisma          # PostgreSQL marketplace/account/session data model
+├── migrations/            # Reproducible schema migrations (init + auth)
 └── seed.ts                 # Idempotent fixture-based Prisma seed
 src/
 ├── app/                    # Routes, layout, global styles
 │   ├── products/           # DB-backed catalog + product detail routes
-│   ├── account/            # Intentionally frontend-only demo account pages
-│   ├── login/              # Frontend-only sign-in screen
-│   ├── register/           # Frontend-only registration screen
+│   ├── account/            # Session-protected customer account pages
+│   ├── login/              # Sign-in screen (posts to a Server Function)
+│   ├── register/           # Registration screen (posts to a Server Function)
 │   ├── globals.css         # Design tokens & layout primitives
 │   ├── layout.tsx          # Shell: header, main, footer
 │   └── page.tsx            # Homepage composition
 ├── components/              # Existing marketplace, account, cart and 3D UI
-├── data/                    # Existing fixtures, seed values and no-DB fallback
-├── lib/server/              # Server-only Prisma client, data access and seeding
-├── lib/                     # Catalog search/sort, account states, cart store, helpers
+├── data/                    # Catalog fixtures, account/order seed values, no-DB catalog fallback
+├── lib/server/              # Server-only Prisma client, data access, auth and seeding
+├── lib/                     # Catalog search/sort, account states, form contracts, cart store
 └── types/                   # Shared catalog and account read types
 ```
 
@@ -136,32 +154,60 @@ pure functions in `src/lib/catalog.ts` and run in the existing browser UI.
 Product cards still use the first gallery image or the original placeholder.
 Detail galleries show `modelPreviews` first, then `images`, with a placeholder
 when both are empty. The local cart continues to resolve known fixture product
-IDs; checkout and server-side cart validation are not part of this PR.
+IDs and stays browser-local; checkout and server-side cart validation are not
+implemented.
 
-## Customer account frontend (PR #4)
+## Authentication and customer accounts (PR #6)
 
-The customer routes remain an integrated **frontend-only preview**. Their fixed
-demo identity, order records, and product-ID download entries live in
-`src/data/mock-account.ts`; catalog product names, categories, versions, and file
-counts come from the existing product fixtures. The same demo concepts are
-included in the optional database seed, but the account UI continues to read its
-centralized mock data and has no login/logout logic, client storage, sessions,
-or access control.
+Sign-in state lives in a database-backed session — not in a JWT and not in the
+browser:
 
-`/login` and `/register` are visual states only. Their forms use browser/client
-validation and explicitly discard the entered values; they do not transmit or
-store passwords or create accounts. Settings are presentational and are not
-persisted. Download buttons are disabled and do not point to a file or endpoint.
-The new customer/order/download data-access functions are server-only building
-blocks, not authentication or authorization; callers must add both before using
-them for private customer data.
+1. `/login`, `/register`, and the settings/sign-out forms submit to Server
+   Functions in `src/lib/server/auth-actions.ts`. Credentials never reach a
+   client component, a route handler, or `localStorage`.
+2. Passwords are hashed with Node's built-in `crypto.scrypt` (N=2^17, r=8, p=1,
+   64-byte key, 16-byte random salt) and stored as `scrypt$N$r$p$salt$digest` in
+   `Customer.passwordHash`. Verification uses `timingSafeEqual`, and an unknown
+   email still runs a full decoy verification so response timing does not reveal
+   which addresses are registered.
+3. A successful sign-in stores a `Session` row holding only the SHA-256 hash of a
+   32-byte random token. The token itself is returned once, in an `HttpOnly`,
+   `SameSite=Lax`, `Path=/` cookie that is `Secure` in production. Because only
+   the hash is stored, a database leak cannot be replayed as a session, and there
+   is no signing secret to configure or rotate.
+4. Sessions last 7 days, or 30 days with "Remember me"
+   (`AUTH_SESSION_MAX_AGE_DAYS`, `AUTH_REMEMBER_ME_MAX_AGE_DAYS`). Expired rows
+   are rejected on read and cleaned up opportunistically. Signing in again on
+   another device does not revoke the first session.
+5. Signing out deletes the `Session` row and clears the cookie in the same
+   request.
 
-Authentication/session management, password handling, protected routes,
-payment processing, checkout, and secure downloads are intentionally deferred.
-To inspect collection UI states without a service, append `?preview=empty`,
+Every protected page calls `requireCustomer()` itself, not only the account
+layout, because Next.js layouts do not re-render on client-side navigation.
+Authorization is enforced where the data is read: `getCustomerOrderById(
+customerId, orderId)` returns nothing for an order that exists but belongs to
+someone else, account queries always filter by the session's customer ID, and
+the settings action derives the customer from the session rather than from the
+submitted form — so a form cannot name a different account. The email address is
+rendered read-only and is deliberately not a submitted field.
+
+Server Functions are public POST endpoints, so each one re-authenticates and
+re-validates its input; Next.js also rejects cross-origin action requests.
+Nothing sensitive is rendered to the browser: the customer projection selects
+explicit columns and never includes `passwordHash`, and session tokens are not
+logged.
+
+The seeded `demo-customer` keeps its three historical orders and five download
+records but has **no** password hash, so it cannot sign in — no credentials are
+committed anywhere. Register your own account to explore the authenticated
+screens.
+
+To inspect collection UI states without data, append `?preview=empty`,
 `?preview=loading`, or `?preview=error` to `/account/purchases` or
-`/account/downloads`; the default state is populated. These are fixed visual
-examples, not simulated requests.
+`/account/downloads`. These are fixed visual examples, not simulated requests.
+
+The scope of this PR stops at authentication and customer accounts; the deferred
+work is listed once, under **Status**.
 
 ## 3D previews
 
@@ -213,7 +259,7 @@ partial and late-loading dependencies.
 
 Scope/limitations: GLB/GLTF only, static model inspection (no animation playback),
 and no Draco, Meshopt, or KTX2 decoder bundles. Other file formats and compressed
-assets requiring those decoders are not supported in this PR. WebGL 2 is
+assets requiring those decoders are not supported yet. WebGL 2 is
 required; otherwise the product page keeps working with a friendly fallback.
 See `public/previews/README.md` for demo provenance/regeneration and
 `docs/pr-3-verification.md` for verification details.

@@ -1,12 +1,7 @@
 import "server-only";
 import type { Prisma, PrismaClient } from "@/generated/prisma/client";
 import type { Category, Product } from "@/types";
-import type {
-  CustomerRecord,
-  OrderStatus,
-  ResolvedDownload,
-  ResolvedOrder,
-} from "@/types/account";
+import type { OrderStatus, ResolvedDownload, ResolvedOrder } from "@/types/account";
 
 export const PRODUCT_INCLUDE = {
   category: true,
@@ -39,26 +34,19 @@ type CategoryRecord = Prisma.CategoryGetPayload<{
 type ProductRecord = Prisma.ProductGetPayload<{
   include: typeof PRODUCT_INCLUDE;
 }>;
-type CustomerRow = Prisma.CustomerGetPayload<{
-  select: {
-    id: true;
-    email: true;
-    name: true;
-    createdAt: true;
-    updatedAt: true;
-  };
-}>;
 type OrderRecord = Prisma.OrderGetPayload<{ include: typeof ORDER_INCLUDE }>;
 type DownloadRecord = Prisma.DownloadGetPayload<{
   include: typeof DOWNLOAD_INCLUDE;
 }>;
 
+/**
+ * Offline fixtures for the public marketplace only. Customer account data has
+ * no fixture fallback: it is reachable exclusively through an authenticated
+ * session (see `src/lib/server/auth.ts`).
+ */
 export interface DataAccessFallbacks {
   products: readonly Product[];
   categories: readonly Category[];
-  customers: readonly CustomerRecord[];
-  orders: readonly { customerId: string; order: ResolvedOrder }[];
-  downloads: readonly { customerId: string; download: ResolvedDownload }[];
 }
 
 export interface ProductListOptions {
@@ -70,10 +58,16 @@ export interface MarketplaceDataAccess {
   getProductBySlug(slug: string): Promise<Product | undefined>;
   getProductById(id: string): Promise<Product | undefined>;
   listCategories(): Promise<Category[]>;
-  getCustomerByEmail(email: string): Promise<CustomerRecord | undefined>;
-  getCustomerById(id: string): Promise<CustomerRecord | undefined>;
+  /** Orders belonging to one customer; `customerId` comes from the session. */
   listCustomerOrders(customerId: string): Promise<ResolvedOrder[]>;
-  getOrderById(id: string): Promise<ResolvedOrder | undefined>;
+  /**
+   * A single order only when it belongs to `customerId`. Ownership is part of
+   * the query, so a URL ID for somebody else's order resolves to `undefined`.
+   */
+  getCustomerOrderById(
+    customerId: string,
+    orderId: string,
+  ): Promise<ResolvedOrder | undefined>;
   listCustomerDownloads(customerId: string): Promise<ResolvedDownload[]>;
   getRelatedProducts(
     product: Pick<Product, "id" | "category">,
@@ -168,16 +162,6 @@ function mapProduct(record: ProductRecord): Product {
     releasedAt: isoDate(record.releasedAt),
     isFeatured: record.isFeatured,
     isNew: record.isNew,
-  };
-}
-
-function mapCustomer(record: CustomerRow): CustomerRecord {
-  return {
-    id: record.id,
-    email: record.email,
-    name: record.name,
-    createdAt: record.createdAt,
-    updatedAt: record.updatedAt,
   };
 }
 
@@ -356,46 +340,20 @@ export function createMarketplaceDataAccess(
     );
   }
 
-  async function getCustomerByEmail(
-    email: string,
-  ): Promise<CustomerRecord | undefined> {
-    const normalizedEmail = email.trim().toLocaleLowerCase("en-US");
-    return read(
-      "customer",
-      () =>
-        fallback.customers.find(
-          (customer) =>
-            customer.email.toLocaleLowerCase("en-US") === normalizedEmail,
-        ),
-      async (client) => {
-        const record = await client.customer.findUnique({
-          where: { email: normalizedEmail },
-        });
-        return record ? mapCustomer(record) : undefined;
-      },
-    );
-  }
-
-  async function getCustomerById(id: string): Promise<CustomerRecord | undefined> {
-    return read(
-      "customer",
-      () => fallback.customers.find((customer) => customer.id === id),
-      async (client) => {
-        const record = await client.customer.findUnique({ where: { id } });
-        return record ? mapCustomer(record) : undefined;
-      },
-    );
-  }
-
+  /**
+   * Customer-scoped account reads.
+   *
+   * `customerId` always comes from a verified session, never from a URL or form
+   * value, and ownership is part of every query. Without a configured database
+   * there is no session to verify, so these resolve to an empty result instead
+   * of reaching for demo fixtures.
+   */
   async function listCustomerOrders(
     customerId: string,
   ): Promise<ResolvedOrder[]> {
     return read(
       "customer orders",
-      () =>
-        fallback.orders
-          .filter((entry) => entry.customerId === customerId)
-          .map((entry) => entry.order),
+      () => [],
       async (client) => {
         const records = await client.order.findMany({
           where: { customerId },
@@ -407,13 +365,18 @@ export function createMarketplaceDataAccess(
     );
   }
 
-  async function getOrderById(id: string): Promise<ResolvedOrder | undefined> {
+  async function getCustomerOrderById(
+    customerId: string,
+    orderId: string,
+  ): Promise<ResolvedOrder | undefined> {
     return read(
       "order",
-      () => fallback.orders.find((entry) => entry.order.id === id)?.order,
+      () => undefined,
       async (client) => {
-        const record = await client.order.findUnique({
-          where: { id },
+        const record = await client.order.findFirst({
+          // Both keys are required: an order ID alone must not leak another
+          // customer's purchase, so a foreign ID resolves to `undefined`.
+          where: { id: orderId, customerId },
           include: ORDER_INCLUDE,
         });
         return record ? mapOrder(record) : undefined;
@@ -426,10 +389,7 @@ export function createMarketplaceDataAccess(
   ): Promise<ResolvedDownload[]> {
     return read(
       "customer downloads",
-      () =>
-        fallback.downloads
-          .filter((entry) => entry.customerId === customerId)
-          .map((entry) => entry.download),
+      () => [],
       async (client) => {
         const records = await client.download.findMany({
           where: { customerId },
@@ -453,10 +413,8 @@ export function createMarketplaceDataAccess(
     getProductBySlug,
     getProductById,
     listCategories,
-    getCustomerByEmail,
-    getCustomerById,
     listCustomerOrders,
-    getOrderById,
+    getCustomerOrderById,
     listCustomerDownloads,
     getRelatedProducts,
   };

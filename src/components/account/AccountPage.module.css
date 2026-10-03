@@ -271,6 +271,13 @@
   line-height: 1.5;
 }
 
+.sessionRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-top: 1rem;
+}
+
 .downloadsGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
