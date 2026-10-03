@@ -1,0 +1,149 @@
+.card {
+  min-width: 0;
+  padding: 1.05rem 1.1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: rgba(9, 12, 18, 0.42);
+  transition: border-color 0.16s ease, background-color 0.16s ease;
+}
+
+.card:hover {
+  border-color: var(--border-strong);
+  background: rgba(14, 18, 27, 0.75);
+}
+
+.topLine {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.8rem;
+  min-width: 0;
+}
+
+.orderHeading {
+  min-width: 0;
+}
+
+.orderLabel,
+.metaLabel {
+  display: block;
+  margin-bottom: 0.2rem;
+  color: var(--text-faint);
+  font-size: 0.69rem;
+  font-weight: 550;
+  letter-spacing: 0.025em;
+}
+
+.orderId {
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 0.86rem;
+  font-weight: 550;
+  letter-spacing: 0;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.orderId a {
+  color: inherit;
+}
+
+.orderId a:hover {
+  color: #c6d1ff;
+  text-decoration: none;
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.9rem 2rem;
+  margin-top: 0.85rem;
+  color: var(--text-muted);
+  font-size: 0.81rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.meta > span {
+  min-width: 5.5rem;
+}
+
+.meta strong {
+  color: var(--text);
+  font-weight: 620;
+}
+
+.items {
+  display: grid;
+  gap: 0.45rem;
+  margin: 0.95rem 0 0;
+  padding: 0.8rem 0 0;
+  border-top: 1px solid var(--border);
+  list-style: none;
+}
+
+.item {
+  display: flex;
+  align-items: baseline;
+  min-width: 0;
+  gap: 0.4rem;
+  color: var(--text-muted);
+  font-size: 0.81rem;
+  line-height: 1.4;
+}
+
+.productName {
+  min-width: 0;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+.productName:hover {
+  color: var(--text);
+  text-decoration: none;
+}
+
+.quantity {
+  flex: 0 0 auto;
+  color: var(--text-faint);
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+}
+
+.bottomLine {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: 0.95rem;
+}
+
+.itemCount {
+  color: var(--text-faint);
+  font-size: 0.72rem;
+}
+
+.viewButton {
+  min-height: 2.75rem;
+}
+
+.compact {
+  padding: 0.9rem;
+}
+
+.compact .bottomLine {
+  margin-top: 0.75rem;
+}
+
+@media (max-width: 420px) {
+  .card {
+    padding: 0.9rem;
+  }
+
+  .topLine {
+    flex-wrap: wrap;
+  }
+
+  .meta {
+    gap: 0.7rem 1.1rem;
+  }
+}

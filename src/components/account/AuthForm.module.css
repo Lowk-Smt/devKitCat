@@ -1,0 +1,243 @@
+.formCard {
+  width: 100%;
+  min-width: 0;
+  padding: clamp(1.25rem, 4vw, 2rem);
+  border: 1px solid var(--border-strong);
+  border-radius: 20px;
+  background:
+    radial-gradient(ellipse at 100% 0%, rgba(93, 125, 249, 0.08), transparent 22rem),
+    linear-gradient(145deg, rgba(19, 23, 33, 0.97), rgba(14, 17, 24, 0.98));
+  box-shadow: 0 25px 64px rgba(0, 0, 0, 0.18);
+}
+
+.formHeading {
+  margin-bottom: 1.35rem;
+}
+
+.eyebrow {
+  margin-bottom: 0.5rem;
+  color: var(--accent-strong);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+
+.formHeading h1 {
+  color: var(--text);
+  font-size: clamp(1.65rem, 3.8vw, 2.05rem);
+  letter-spacing: -0.045em;
+  overflow-wrap: anywhere;
+}
+
+.description {
+  margin-top: 0.55rem;
+  color: var(--text-muted);
+  font-size: 0.87rem;
+  line-height: 1.5;
+}
+
+.demoNotice {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  margin-bottom: 1.25rem;
+  padding: 0.7rem 0.75rem;
+  border: 1px solid rgba(93, 125, 249, 0.2);
+  border-radius: var(--radius-sm);
+  background: rgba(93, 125, 249, 0.055);
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+
+.demoNotice svg {
+  flex: 0 0 auto;
+  margin-top: 0.05rem;
+  color: var(--accent-strong);
+}
+
+.demoNotice p {
+  min-width: 0;
+}
+
+.form {
+  display: grid;
+  gap: 1rem;
+}
+
+.input {
+  display: block;
+  width: 100%;
+  min-height: 2.9rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: rgba(8, 10, 15, 0.62);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.88rem;
+  padding: 0.65rem 0.8rem;
+}
+
+.input::placeholder {
+  color: var(--text-faint);
+}
+
+.input[aria-invalid="true"] {
+  border-color: rgba(255, 112, 112, 0.8);
+}
+
+.passwordWrap {
+  position: relative;
+}
+
+.passwordInput {
+  padding-right: 3.1rem;
+}
+
+.passwordToggle {
+  position: absolute;
+  top: 50%;
+  right: 0.15rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 7px;
+  color: var(--text-muted);
+  transform: translateY(-50%);
+}
+
+.passwordToggle:hover {
+  color: var(--text);
+  background: rgba(148, 163, 184, 0.08);
+}
+
+.passwordToggle:focus-visible {
+  outline-offset: 1px;
+}
+
+.loginOptions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35rem 0.7rem;
+  margin-top: -0.2rem;
+}
+
+.remember {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
+  gap: 0.55rem;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.remember input,
+.termsCheck input {
+  flex: 0 0 auto;
+  width: 1.05rem;
+  height: 1.05rem;
+  accent-color: var(--accent);
+}
+
+.forgotButton {
+  min-height: 2.75rem;
+  color: var(--accent-strong);
+  font-size: 0.76rem;
+  font-weight: 570;
+  text-align: right;
+}
+
+.forgotButton:hover {
+  color: #b8c5ff;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.termsGroup {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.termsDetails {
+  color: var(--text-faint);
+  font-size: 0.73rem;
+  line-height: 1.5;
+}
+
+.termsDetails summary {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.5rem;
+  color: var(--accent-strong);
+  cursor: pointer;
+  font-weight: 550;
+}
+
+.termsDetails p {
+  padding: 0.4rem 0 0.7rem;
+}
+
+.termsCheck {
+  display: flex;
+  align-items: flex-start;
+  min-height: 2.75rem;
+  gap: 0.6rem;
+  padding-top: 0.55rem;
+  color: var(--text-muted);
+  font-size: 0.76rem;
+  line-height: 1.45;
+  cursor: pointer;
+}
+
+.termsCheck input {
+  margin-top: 0.13rem;
+}
+
+.feedback {
+  padding: 0.7rem 0.8rem;
+  border: 1px solid rgba(93, 125, 249, 0.22);
+  border-radius: var(--radius-sm);
+  background: rgba(93, 125, 249, 0.07);
+  color: #c5d0ff;
+  font-size: 0.77rem;
+  line-height: 1.5;
+}
+
+.switchPrompt {
+  margin-top: 1.15rem;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  text-align: center;
+}
+
+.switchPrompt a {
+  color: var(--accent-strong);
+  font-weight: 600;
+}
+
+.switchPrompt a:hover {
+  color: #b8c5ff;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+@media (max-width: 380px) {
+  .formCard {
+    padding: 1.1rem;
+  }
+
+  .loginOptions {
+    justify-content: flex-start;
+  }
+
+  .forgotButton {
+    text-align: left;
+  }
+}

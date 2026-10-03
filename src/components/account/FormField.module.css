@@ -1,0 +1,26 @@
+.field {
+  display: grid;
+  min-width: 0;
+  gap: 0.38rem;
+}
+
+.label {
+  color: var(--text);
+  font-size: 0.79rem;
+  font-weight: 580;
+}
+
+.control {
+  min-width: 0;
+}
+
+.hint,
+.error {
+  color: var(--text-faint);
+  font-size: 0.72rem;
+  line-height: 1.45;
+}
+
+.error {
+  color: #ff9c9c;
+}
