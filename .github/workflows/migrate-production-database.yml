@@ -1,0 +1,119 @@
+# One-time production database initialization for the Neon PostgreSQL database.
+#
+# The production database has no tables and no `public."_prisma_migrations"`
+# table, so PostgreSQL-backed pages fail (HTTP 500). This workflow applies the
+# migrations already committed under `prisma/migrations/` with Prisma's
+# non-destructive `prisma migrate deploy` command (the existing `npm run db:deploy`
+# script) and lets Prisma create and record `public."_prisma_migrations"`.
+#
+# Trigger: manual only (`workflow_dispatch`). Pushes, pull requests, schedules,
+# and ordinary Vercel deployments never run it.
+#
+# One-time setup: GitHub repository -> Settings -> Secrets and variables ->
+#   Actions -> "New repository secret"
+#     Name:  DATABASE_URL
+#     Value: Neon's DIRECT connection string (the host WITHOUT `-pooler`), e.g.
+#            postgresql://USER:PASSWORD@ep-xxxx-xxxx.REGION.aws.neon.tech/DBNAME?sslmode=require
+#   Copy it from the Neon dashboard's "Direct connection" toggle. Vercel's
+#   runtime `DATABASE_URL` is a separate setting and is not changed here; keep
+#   the pooled connection string there for serverless functions.
+#
+# Manual run: Actions -> "Initialize production database" -> "Run workflow" ->
+#   choose the branch that holds the migrations (normally `main`) -> "Run
+#   workflow". Equivalent CLI form:
+#     gh workflow run migrate-production-database.yml --ref main
+#   GitHub only shows the "Run workflow" button once this file exists on the
+#   default branch, so merge the pull request that adds it before running it.
+#   The run is safe to repeat: `migrate deploy` applies only the migrations that
+#   are missing from the database's migration history.
+#
+# This workflow initializes the schema only. It intentionally does not seed, so
+# the deployed site serves an empty (rather than failing) catalog until real
+# product data is loaded.
+#
+# Safety properties:
+#   * Only committed migrations are applied, in order. `prisma migrate reset`,
+#     `prisma db push`, and `prisma migrate dev` are never invoked, and no SQL is
+#     inserted by hand.
+#   * Seeding never runs here: `npm run db:seed` is not part of this workflow.
+#   * The `DATABASE_URL` secret is passed only to the steps that need it, is
+#     never echoed, and GitHub masks its value in logs.
+#   * The concurrency group below allows at most one migration job at a time.
+#   * `prisma migrate deploy` is additive: if the database already contained a
+#     schema without a migration history, Prisma stops with error P3005 instead
+#     of overwriting it.
+
+name: Initialize production database
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  # Serializes production migrations: a second run waits instead of migrating in parallel.
+  group: production-database-migrations
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    name: Apply committed Prisma migrations
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          # Prisma 7 supports ^20.19 || ^22.12 || >=24.0 and Next.js 16 requires
+          # >=20.9; Node 22 (latest 22.x) satisfies both and matches local
+          # development.
+          node-version: "22"
+          cache: npm
+
+      # Fails fast on a missing or pooled connection string before anything
+      # touches the database. The secret is scoped to individual steps so that
+      # dependency install scripts never receive the production credential.
+      - name: Verify the DATABASE_URL secret
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          if [ -z "${DATABASE_URL}" ]; then
+            echo "::error title=Missing secret::Add the DATABASE_URL repository secret (Neon direct connection string) before running this workflow."
+            exit 1
+          fi
+
+          case "${DATABASE_URL}" in
+            postgresql://* | postgres://*) ;;
+            *)
+              echo "::error title=Invalid secret::The DATABASE_URL secret must be a postgresql:// connection string."
+              exit 1
+              ;;
+          esac
+
+          lowercase_url="${DATABASE_URL,,}"
+          if [[ "${lowercase_url}" == *"-pooler."* || "${lowercase_url}" == *"pgbouncer=true"* ]]; then
+            echo "::error title=Pooled endpoint::Prisma Migrate requires Neon's direct connection string (no '-pooler' host and no 'pgbouncer=true' parameter). Update the secret and re-run; the Vercel runtime variable stays on the pooled URL."
+            exit 1
+          fi
+
+          echo "Connection string checks passed. The value is deliberately not printed."
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npm run db:generate
+
+      - name: Apply committed migrations
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: npm run db:deploy
+
+      - name: Confirm the migration history is in sync
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: npx prisma migrate status
