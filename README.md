@@ -114,6 +114,7 @@ Open [http://localhost:3000](http://localhost:3000).
 | `npm run db:migrate`            | Apply/create development migrations; requires `DATABASE_URL`       |
 | `npm run db:deploy`             | Apply committed migrations in deployment environments              |
 | `npm run db:seed`               | Idempotently seed the existing marketplace/demo fixture values     |
+| `npm run db:seed:catalog`       | Idempotently seed only categories/products (no demo account records) |
 | `npm run db:studio`             | Open Prisma Studio against `DATABASE_URL`                          |
 
 ## Routes
@@ -138,7 +139,9 @@ Open [http://localhost:3000](http://localhost:3000).
 prisma/
 ├── schema.prisma          # PostgreSQL marketplace/account/session data model
 ├── migrations/            # Reproducible schema migrations (init + auth + cart/checkout)
-└── seed.ts                 # Idempotent fixture-based Prisma seed
+├── seed.ts                # Idempotent fixture-based demo seed (catalog + demo account)
+├── seed-catalog.ts        # Catalog-only production seed (validates DATABASE_URL first)
+└── seed-catalog-runner.ts # Catalog-only seed runner (loads the generated client)
 src/
 ├── app/                    # Routes, layout, global styles
 │   ├── products/           # DB-backed catalog + product detail routes
@@ -162,6 +165,11 @@ src/
 fixtures as deterministic seed input and as the explicit no-`DATABASE_URL`
 fallback. When PostgreSQL is configured, Server Components use
 `src/lib/server/data-access.ts`; Prisma and `DATABASE_URL` stay on the server.
+Two seeds project those fixtures: `npm run db:seed` additionally writes the demo
+customer, orders, and downloads (development only), while
+`npm run db:seed:catalog` writes only categories and products and is the command
+to populate a deployed catalog — see
+[`docs/pr-9-catalog-seed.md`](docs/pr-9-catalog-seed.md).
 The existing `Product` type in `src/types` still covers everything rendered
 (`images`, `modelPreviews`, `overview`, `features`, `requirements`,
 `includedFiles`, `installation`, `documentation`, `changelog`, `license`,

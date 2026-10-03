@@ -58,7 +58,12 @@ export interface SeedDownload {
   createdAt: Date;
 }
 
-export interface MarketplaceSeedData {
+export interface CatalogSeedData {
+  categories: SeedCategory[];
+  products: SeedProduct[];
+}
+
+export interface MarketplaceSeedData extends CatalogSeedData {
   /**
    * Sample customer for the seeded order/download records. It deliberately has
    * no password, so it cannot sign in; register an account to use `/account`.
@@ -70,8 +75,6 @@ export interface MarketplaceSeedData {
     preferences: CustomerPreferences;
     createdAt: Date;
   };
-  categories: SeedCategory[];
-  products: SeedProduct[];
   orders: SeedOrder[];
   downloads: SeedDownload[];
 }
@@ -81,12 +84,14 @@ function atUtcMidnight(isoDate: string): Date {
 }
 
 /**
- * Projects the current catalog and PR #4 fixtures into stable database seeds.
- * IDs, ordering, snapshots and values come from those existing fixtures.
+ * Projects only the catalog fixtures (`src/data/categories.ts` and
+ * `src/data/products.ts`) into stable database seeds. IDs are the fixture IDs,
+ * ordering is each fixture's array order, and every product is published, so
+ * the result is deterministic and safe to replay. No account fixtures are
+ * referenced here: this is the projection a catalog-only seed can use.
  */
-export function buildMarketplaceSeedData(): MarketplaceSeedData {
+export function buildCatalogSeedData(): CatalogSeedData {
   const categoryBySlug = new Map(categories.map((category) => [category.slug, category]));
-  const productById = new Map(products.map((product) => [product.id, product]));
 
   const seedCategories: SeedCategory[] = categories.map((category, sortOrder) => ({
     ...category,
@@ -106,6 +111,18 @@ export function buildMarketplaceSeedData(): MarketplaceSeedData {
       published: true,
     };
   });
+
+  return { categories: seedCategories, products: seedProducts };
+}
+
+/**
+ * Projects the current catalog and PR #4 fixtures into stable database seeds.
+ * IDs, ordering, snapshots and values come from those existing fixtures.
+ */
+export function buildMarketplaceSeedData(): MarketplaceSeedData {
+  const { categories: seedCategories, products: seedProducts } = buildCatalogSeedData();
+  const categoryBySlug = new Map(categories.map((category) => [category.slug, category]));
+  const productById = new Map(products.map((product) => [product.id, product]));
 
   const seedOrders: SeedOrder[] = mockOrders.map((order) => ({
     id: order.id,
