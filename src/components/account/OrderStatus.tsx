@@ -2,6 +2,7 @@ import type { OrderStatus } from "@/types/account";
 import styles from "./OrderStatus.module.css";
 
 const STATUS_LABELS: Record<OrderStatus, string> = {
+  "pending-payment": "Awaiting payment",
   complete: "Complete",
   processing: "Processing",
   refunded: "Refunded",

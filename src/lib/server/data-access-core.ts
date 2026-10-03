@@ -103,14 +103,28 @@ const CATEGORY_ICON_MAP: Record<CategoryRecord["icon"], Category["icon"]> = {
   COMPLETE_KITS: "complete-kits",
 };
 
+/**
+ * `PENDING_PAYMENT` is what checkout creates: a submitted order that no payment
+ * provider has settled. It renders as its own status so an unpaid order is never
+ * mistaken for a completed purchase.
+ */
 const ORDER_STATUS_MAP: Record<string, OrderStatus> = {
   COMPLETE: "complete",
   PROCESSING: "processing",
   REFUNDED: "refunded",
+  PENDING_PAYMENT: "pending-payment",
 };
 
 function isoDate(date: Date): string {
   return date.toISOString().slice(0, 10);
+}
+
+/**
+ * Display icon for a database category. Exported so the cart read can reuse the
+ * catalog's mapping instead of keeping a second copy of it.
+ */
+export function mapCategoryIcon(icon: CategoryRecord["icon"]): Category["icon"] {
+  return CATEGORY_ICON_MAP[icon];
 }
 
 function mapCategory(category: CategoryRecord): Category {
@@ -119,7 +133,7 @@ function mapCategory(category: CategoryRecord): Category {
     name: category.name,
     slug: category.slug,
     description: category.description,
-    icon: CATEGORY_ICON_MAP[category.icon],
+    icon: mapCategoryIcon(category.icon),
   };
 }
 

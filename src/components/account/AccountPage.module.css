@@ -197,6 +197,11 @@
   color: var(--text);
 }
 
+/* Confirmation banner shown after checkout places an unpaid order. */
+.placedNotice {
+  margin-bottom: 1rem;
+}
+
 .detailGrid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(15rem, 18.5rem);
@@ -350,7 +355,12 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .detailGrid {
+  /* Confirmation banner shown after checkout places an unpaid order. */
+.placedNotice {
+  margin-bottom: 1rem;
+}
+
+.detailGrid {
     grid-template-columns: minmax(0, 1fr) minmax(14rem, 17rem);
   }
 }
@@ -362,7 +372,12 @@
 }
 
 @media (max-width: 680px) {
-  .detailGrid {
+  /* Confirmation banner shown after checkout places an unpaid order. */
+.placedNotice {
+  margin-bottom: 1rem;
+}
+
+.detailGrid {
     grid-template-columns: minmax(0, 1fr);
   }
 

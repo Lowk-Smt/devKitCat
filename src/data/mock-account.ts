@@ -23,7 +23,14 @@ export const mockCustomer = {
   },
 } as const;
 
-export type MockOrderStatus = OrderStatus;
+/**
+ * The seeded fixtures are historical purchases, so they only use settled
+ * states. `pending-payment` is produced by checkout, never by the seed.
+ */
+export type MockOrderStatus = Extract<
+  OrderStatus,
+  "complete" | "processing" | "refunded"
+>;
 
 export interface MockOrderItem {
   /** References `Product.id` in the existing marketplace catalog. */

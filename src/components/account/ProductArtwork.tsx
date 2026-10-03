@@ -1,18 +1,21 @@
 import { ProductImage } from "@/components/product/ProductImage";
 import { ProductThumbnail } from "@/components/product/ProductThumbnail";
 import { getCategoryBySlug } from "@/data/categories";
-import type { Product } from "@/types";
+import type { IconName, Product } from "@/types";
 import styles from "./ProductArtwork.module.css";
 
 interface ProductArtworkProps {
-  product: Pick<Product, "title" | "category" | "images">;
+  /** `category` is only used to choose a placeholder icon, so it is optional. */
+  product: Pick<Product, "title" | "images"> & { category?: Product["category"] };
   size?: "sm" | "md";
+  /** Placeholder icon to use instead of the category lookup (cart lines). */
+  icon?: IconName;
 }
 
 /** Small product art for account lists; uses the catalog image or its existing placeholder. */
-export function ProductArtwork({ product, size = "md" }: ProductArtworkProps) {
-  const category = getCategoryBySlug(product.category);
-  const icon = category?.icon ?? "systems";
+export function ProductArtwork({ product, size = "md", icon: iconOverride }: ProductArtworkProps) {
+  const category = product.category ? getCategoryBySlug(product.category) : undefined;
+  const icon = iconOverride ?? category?.icon ?? "systems";
   const fallback = (
     <ProductThumbnail
       icon={icon}

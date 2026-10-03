@@ -11,7 +11,7 @@
     "lint": "eslint .",
     "typecheck": "next typegen && tsc --noEmit",
     "pretypecheck": "prisma generate",
-    "test": "node --experimental-strip-types --test tests/account-presentation.test.mjs tests/model-preview.test.mjs && node --conditions=react-server --import=tsx --test tests/authentication.test.mjs tests/database-foundation.test.mjs",
+    "test": "node --experimental-strip-types --test tests/account-presentation.test.mjs tests/model-preview.test.mjs && node --conditions=react-server --import=tsx --test tests/authentication.test.mjs tests/database-foundation.test.mjs tests/cart-checkout.test.mjs",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",

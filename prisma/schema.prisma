@@ -30,6 +30,9 @@ enum OrderStatus {
   COMPLETE
   PROCESSING
   REFUNDED
+  /// Submitted through checkout but not paid: no payment provider is connected
+  /// yet, so an order in this state grants no download entitlement.
+  PENDING_PAYMENT
 }
 
 enum DownloadStatus {
@@ -89,6 +92,7 @@ model Product {
   changelog     ProductChangelogEntry[]
   orderItems    OrderItem[]
   downloads     Download[]
+  cartItems     CartItem[]
 
   @@index([categoryId, published, sortOrder])
   @@index([published, isFeatured, sortOrder])
@@ -158,6 +162,7 @@ model Customer {
   orders    Order[]
   downloads Download[]
   sessions  Session[]
+  cartItems CartItem[]
 }
 
 /// Server-side session records. Only the SHA-256 hash of the opaque cookie
@@ -176,18 +181,47 @@ model Session {
   @@index([expiresAt])
 }
 
+/// One saved line in a signed-in customer's cart.
+///
+/// Carts belong to a `Customer` row, never to an anonymous browser: without a
+/// verified session there is nothing to own a row, so the storefront keeps its
+/// existing browser-local cart instead. `customerId` + `productId` is unique,
+/// which makes "add this product again" a quantity change rather than a second
+/// line. Prices are never stored here — they are always read from `Product`.
+model CartItem {
+  id         String   @id @default(cuid())
+  customerId String
+  productId  String
+  quantity   Int      @default(1)
+  createdAt  DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt  DateTime @updatedAt @db.Timestamptz(3)
+
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  product  Product  @relation(fields: [productId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@unique([customerId, productId])
+  @@index([customerId])
+  @@index([productId])
+}
+
 model Order {
   id         String      @id @default(cuid())
   customerId String
   status     OrderStatus
   total      Decimal     @db.Decimal(10, 2)
   currency   String      @default("USD") @db.VarChar(3)
-  createdAt  DateTime    @default(now()) @db.Timestamptz(3)
-  updatedAt  DateTime    @updatedAt @db.Timestamptz(3)
+  /// Client-supplied, server-validated checkout token. It lets a retried or
+  /// double-submitted checkout resolve to the order it already created instead
+  /// of creating a second one; uniqueness is enforced per customer below. Null
+  /// for the seeded historical orders, which predate checkout.
+  idempotencyKey String?   @db.VarChar(64)
+  createdAt      DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime  @updatedAt @db.Timestamptz(3)
 
   customer Customer    @relation(fields: [customerId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   items    OrderItem[]
 
+  @@unique([customerId, idempotencyKey])
   @@index([customerId, createdAt])
 }
 

@@ -9,10 +9,11 @@ tools, templates, and complete starter kits.
 ## Status
 
 PRs #1 (marketplace foundation/design system), #2 (browsing/search/product
-pages/cart UI), #3 (Three.js previews), #4 (customer/account UI), and #5
-(PostgreSQL + Prisma backend/database foundation) are merged. This branch
-contains the completed implementation for **PR #6 — authentication and customer
-accounts** and is ready for review; PR #6 is not yet merged:
+pages/cart UI), #3 (Three.js previews), #4 (customer/account UI), #5
+(PostgreSQL + Prisma backend/database foundation), and #6 (real authentication,
+database-backed sessions, protected accounts) are merged. This branch contains
+the completed implementation for **PR #7 — database-backed cart and checkout
+foundation** and is ready for review; PR #7 is not yet merged:
 
 - `/login` and `/register` are wired to a real backend. Registration creates a
   `Customer` row with a scrypt password digest; sign-in verifies it and issues an
@@ -31,21 +32,35 @@ accounts** and is ready for review; PR #6 is not yet merged:
 - The marketplace UI remains client-interactive: search, category filters,
   sorting, result counts, cards, product detail, related products, galleries,
   and 3D previews keep their existing component contracts.
-- The client-side **cart UI** remains local-only (`localStorage`) and has no
-  checkout or payment behavior. Download buttons remain disabled placeholders;
-  secure paid-file delivery is a future PR.
+- The **cart is database-backed** for signed-in customers: lines persist in a
+  new `CartItem` table, survive reloads and devices, support quantities of 1-10
+  per product, and every read or mutation is scoped to the session's customer.
+  Signed-out visitors keep the existing browser-local cart, which cannot be
+  ordered.
+- **`/checkout`** reviews the cart and submits an order. Prices and totals are
+  recalculated on the server from current catalog rows; the checkout form
+  carries no price, total, or owner. Submission writes an **unpaid**
+  `PENDING_PAYMENT` order with item snapshots and clears the cart in one
+  transaction, then confirms on the order's own page.
+- **No payment is taken.** There is no payment provider, card collection,
+  payment webhook, or simulated success endpoint; an unpaid order unlocks no
+  download, and download buttons remain disabled placeholders.
 
-Account routes deliberately have **no** fixture fallback: without
+Account and cart data deliberately have **no** fixture fallback: without
 `DATABASE_URL`, `/login` and `/register` report that account services are
-unavailable and the protected routes redirect, so no demo identity is ever
-rendered as if it were signed in.
+unavailable, the protected routes redirect, cart services report themselves
+unavailable, and the storefront keeps its browser-local cart — so no demo
+identity is ever rendered as if it were signed in.
 
-Not yet implemented (left for future PRs): payments/checkout, secure downloads,
-email verification, password reset, login rate limiting, OAuth/social sign-in,
-admin and seller tooling, real production product imagery, reviews, and online
+Not yet implemented (left for future PRs): payments and payment webhooks, secure
+downloads, tax/shipping/discount rules, cart merging on sign-in, email
+verification, password reset, login rate limiting, OAuth/social sign-in, admin
+and seller tooling, real production product imagery, reviews, and online
 documentation pages. See
+[`docs/pr-7-cart-checkout.md`](docs/pr-7-cart-checkout.md) for the cart and
+checkout architecture,
 [`docs/pr-6-authentication.md`](docs/pr-6-authentication.md) for the
-authentication architecture and
+authentication architecture, and
 [`docs/pr-5-backend-database.md`](docs/pr-5-backend-database.md) for local
 database and deployment setup.
 
@@ -115,27 +130,29 @@ Open [http://localhost:3000](http://localhost:3000).
 | `/account/purchases/:id` | The customer's own order details (404 for unknown or unowned IDs) |
 | `/account/downloads` | The customer's own library; download controls are disabled placeholders |
 | `/account/settings` | Profile and preferences, persisted for the signed-in customer |
+| `/checkout`       | The signed-in customer's cart review and order submission (payment not enabled) |
 
 ## Project structure
 
 ```
 prisma/
 ├── schema.prisma          # PostgreSQL marketplace/account/session data model
-├── migrations/            # Reproducible schema migrations (init + auth)
+├── migrations/            # Reproducible schema migrations (init + auth + cart/checkout)
 └── seed.ts                 # Idempotent fixture-based Prisma seed
 src/
 ├── app/                    # Routes, layout, global styles
 │   ├── products/           # DB-backed catalog + product detail routes
 │   ├── account/            # Session-protected customer account pages
+│   ├── checkout/           # Cart review + unpaid order submission (protected)
 │   ├── login/              # Sign-in screen (posts to a Server Function)
 │   ├── register/           # Registration screen (posts to a Server Function)
 │   ├── globals.css         # Design tokens & layout primitives
 │   ├── layout.tsx          # Shell: header, main, footer
 │   └── page.tsx            # Homepage composition
-├── components/              # Existing marketplace, account, cart and 3D UI
+├── components/              # Marketplace, account, cart, checkout and 3D UI
 ├── data/                    # Catalog fixtures, account/order seed values, no-DB catalog fallback
-├── lib/server/              # Server-only Prisma client, data access, auth and seeding
-├── lib/                     # Catalog search/sort, account states, form contracts, cart store
+├── lib/server/              # Server-only Prisma client, data access, auth, cart/checkout, seeding
+├── lib/                     # Catalog search/sort, account states, form contracts, money, cart store
 └── types/                   # Shared catalog and account read types
 ```
 
@@ -153,9 +170,10 @@ pure functions in `src/lib/catalog.ts` and run in the existing browser UI.
 
 Product cards still use the first gallery image or the original placeholder.
 Detail galleries show `modelPreviews` first, then `images`, with a placeholder
-when both are empty. The local cart continues to resolve known fixture product
-IDs and stays browser-local; checkout and server-side cart validation are not
-implemented.
+when both are empty. For a signed-in customer the cart comes from the database
+and always prices itself from the current `Product` rows; for a signed-out
+visitor it stays browser-local, resolves known fixture product IDs, and cannot
+be ordered.
 
 ## Authentication and customer accounts (PR #6)
 
@@ -207,6 +225,47 @@ To inspect collection UI states without data, append `?preview=empty`,
 `/account/downloads`. These are fixed visual examples, not simulated requests.
 
 The scope of this PR stops at authentication and customer accounts; the deferred
+work is listed once, under **Status**.
+
+## Cart and checkout (PR #7)
+
+A signed-in customer's cart lives in PostgreSQL, not in the browser:
+
+1. The cart UI reads the database cart once per page load through
+   `readCartAction`, and every mutation (`add`, quantity change, remove, clear)
+   is a Server Function in `src/lib/server/cart-actions.ts`. Each one
+   re-authenticates with `requireCustomer()` and derives the owner from the
+   session, so no request can name another customer's cart. Signed-out visitors
+   keep the existing `localStorage` cart and are sent to sign in to check out.
+2. Adding a product requires it to exist and be published. The unique
+   `(customerId, productId)` index turns a repeated add into a quantity change,
+   so a product can never occupy two lines. Quantities are 1-10 per line and at
+   most 20 distinct products per cart; anything else is rejected server-side.
+3. Prices are read from the current `Product` row on every read and again inside
+   the checkout transaction, and are handled as integer cents
+   (`src/lib/money.ts`) before being written back as `DECIMAL(10,2)` text. The
+   browser sends no price, total, discount, product name, or owner: the checkout
+   form posts only a server-generated idempotency key and the subtotal that was
+   displayed.
+4. Submitting revalidates the cart, availability, quantities, and prices, then
+   writes an `Order` in `PENDING_PAYMENT` with `OrderItem` snapshots (title,
+   slug, category, version, unit price, quantity) and clears the cart in **one
+   transaction**. A price change since the page rendered refuses the order and
+   asks for a fresh review; a failure rolls everything back, so a cart is never
+   cleared without an order.
+5. The idempotency key is unique per customer in the database, so a double
+   submission resolves to the order it already created instead of duplicating
+   it. Success redirects to `/account/purchases/:id?placed=1`, the existing
+   customer-scoped order page, with a confirmation that nothing was charged.
+
+**Checkout does not take payment.** It writes an unpaid order and nothing else:
+no card details are collected, no order is marked paid or complete, no
+`Download` row is created, and no download control is enabled. Both the checkout
+screen and the confirmation say that no payment provider is connected yet. No
+tax, shipping, or discount policy is applied — the subtotal is the catalog
+total, and final payment calculations arrive with the payment integration.
+
+The scope of this PR stops at the cart and the checkout foundation; the deferred
 work is listed once, under **Status**.
 
 ## 3D previews

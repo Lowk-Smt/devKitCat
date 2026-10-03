@@ -69,3 +69,94 @@
   font-variant-numeric: tabular-nums;
   font-size: 0.95rem;
 }
+
+.remove:disabled {
+  color: var(--text-faint);
+  cursor: progress;
+}
+
+/* The 44px artwork box clips the product image to its own rounded square. */
+.icon {
+  overflow: hidden;
+}
+
+.icon > div {
+  width: 100%;
+  height: 100%;
+  aspect-ratio: auto;
+  border: none;
+}
+
+.icon img {
+  object-fit: cover;
+}
+
+.price {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.15rem;
+  text-align: right;
+}
+
+.lineTotal {
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.95rem;
+}
+
+.quantityNote {
+  color: var(--text-faint);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.quantityRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+  margin-top: 0.4rem;
+  padding: 0.1rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+}
+
+.step {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 50%;
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  line-height: 1;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+}
+
+.step:hover:not(:disabled) {
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
+.step:disabled {
+  color: var(--text-faint);
+  cursor: not-allowed;
+}
+
+.quantityValue {
+  min-width: 1.4rem;
+  color: var(--text);
+  font-size: 0.85rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.unavailable {
+  color: #f2c477;
+  font-size: 0.78rem;
+}
