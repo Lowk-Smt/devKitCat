@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { connection } from "next/server";
 import { ProductBrowser } from "@/components/marketplace/ProductBrowser";
 import { SectionHeading } from "@/components/ui/SectionHeading";
-import { listCategories, listProducts } from "@/lib/server/data-access";
+import { getCachedCategories, getCachedProducts } from "@/lib/server/catalog-cache";
 import { cx } from "@/lib/cx";
 import styles from "./products.module.css";
 
@@ -15,10 +15,13 @@ export const metadata: Metadata = {
 export default async function ProductsPage() {
   // Render per request so the server HTML already reflects the URL's
   // search / category / sort (ProductBrowser reads them with useSearchParams).
+  // The reads themselves are served from the shared catalog cache
+  // (`src/lib/server/catalog-cache.ts`), so a warm render does not pay the
+  // remote-database round trip on every navigation.
   await connection();
   const [products, categories] = await Promise.all([
-    listProducts(),
-    listCategories(),
+    getCachedProducts(),
+    getCachedCategories(),
   ]);
 
   return (
