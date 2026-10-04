@@ -65,6 +65,32 @@ export interface CatalogSeedSummary {
 }
 
 /**
+ * Explicit budget for the catalog seed's interactive transaction.
+ *
+ * Prisma's defaults for interactive transactions are `maxWait: 2_000` and
+ * `timeout: 5_000` milliseconds. The catalog write runs 41 sequential
+ * statements (8 category upserts, 6 product upserts, 18 child-table prunes, and
+ * 9 child upserts, plus BEGIN and COMMIT) and every statement is a separate
+ * round trip, so the default 5s budget expires midway through a remote (Neon)
+ * run and the command fails
+ * with `P2028`: "A query cannot be executed on an expired transaction. The
+ * timeout for this transaction was 5000 ms, however 5792 ms passed…". That
+ * failure is reproduced deterministically in `docs/pr-10-catalog-seed-timeout-fix.md`
+ * by adding latency to a local database.
+ *
+ * `maxWait` covers transaction startup (pool checkout + `BEGIN`) and is kept
+ * above the pg pool's own `connectionTimeoutMillis` (5s) so that a pool that
+ * cannot connect surfaces the driver's descriptive error rather than Prisma's
+ * generic "Unable to start a transaction in the given time." `timeout` covers
+ * the whole catalog write; the seed stays a single transaction, so the catalog
+ * is still all-or-nothing.
+ */
+export const CATALOG_SEED_TRANSACTION_OPTIONS: { maxWait: number; timeout: number } = {
+  maxWait: 15_000,
+  timeout: 60_000,
+};
+
+/**
  * Upserts category and product rows (plus their ordered image, model-preview
  * and changelog child rows) inside an already-open transaction.
  *
@@ -190,9 +216,15 @@ export async function seedCatalog(
   prisma: PrismaClient,
   data: CatalogSeedData = buildCatalogSeedData(),
 ): Promise<CatalogSeedSummary> {
-  await prisma.$transaction(async (tx) => {
-    await writeCatalog(tx, data);
-  });
+  // The budget is passed per call (rather than relying on the client's
+  // `transactionOptions` defaults) so both the CLI runner and the tests see the
+  // same explicit values. Prisma 7 requires both keys to be present.
+  await prisma.$transaction(
+    async (tx) => {
+      await writeCatalog(tx, data);
+    },
+    CATALOG_SEED_TRANSACTION_OPTIONS,
+  );
 
   return {
     categories: data.categories.length,

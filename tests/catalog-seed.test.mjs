@@ -44,6 +44,7 @@ function makeInstrumentedPrisma() {
     [...CATALOG_TABLES, ...ACCOUNT_TABLES].map((name) => [name, new Map()]),
   );
   const calls = [];
+  const transactionOptions = [];
 
   const uniqueKey = (table, where) => {
     if (typeof where.id === "string") return where.id;
@@ -83,8 +84,10 @@ function makeInstrumentedPrisma() {
   return {
     tables,
     calls,
+    transactionOptions,
     prisma: {
-      async $transaction(callback) {
+      async $transaction(callback, options) {
+        transactionOptions.push(options);
         return callback(transaction);
       },
     },
@@ -213,6 +216,36 @@ test("repeated catalog seed runs stay idempotent on stable unique keys", async (
       assert.deepEqual(Object.keys(args.where), ["productId_position"], `${name} where key`);
     }
   }
+});
+
+test("catalog seed passes an explicit interactive transaction budget", async () => {
+  const { prisma, transactionOptions } = makeInstrumentedPrisma();
+
+  await seedCatalog(prisma);
+
+  // Prisma's interactive transaction defaults are maxWait 2000ms / timeout
+  // 5000ms, and the catalog write (41 sequential statements plus BEGIN/COMMIT,
+  // one round trip each) exceeded the 5s default against Neon: P2028
+  // ("...the timeout for this transaction was 5000 ms, however 5792 ms passed
+  // since the start of the transaction."). The seed must therefore not rely on
+  // the client's defaults.
+  assert.equal(transactionOptions.length, 1);
+  const options = transactionOptions[0];
+  assert.ok(options, "seedCatalog must pass options to $transaction");
+  assert.equal(typeof options.maxWait, "number");
+  assert.equal(typeof options.timeout, "number");
+
+  // Both values are required by Prisma 7 (it rejects a partial options object
+  // with "maxWait is required" / "timeout is required"), and both must be
+  // positive whole milliseconds.
+  assert.ok(Number.isInteger(options.maxWait) && options.maxWait > 0);
+  assert.ok(Number.isInteger(options.timeout) && options.timeout > 0);
+
+  // A 60s transaction budget with a smaller startup budget, well above the
+  // defaults that failed in production.
+  assert.ok(options.timeout >= 60_000, `timeout ${options.timeout} must allow 60s`);
+  assert.ok(options.maxWait >= 10_000, `maxWait ${options.maxWait} must exceed the pg pool timeout`);
+  assert.ok(options.maxWait < options.timeout, "startup budget must fit inside the transaction budget");
 });
 
 test("full demo seed still shares one catalog projection with the catalog seed", () => {

@@ -80,9 +80,16 @@ DATABASE_URL="<paste the Neon connection string here>" npm run db:seed:catalog
 Expected output:
 
 ```
-Seeded catalog: 8 categories and 6 products (1 images, 2 model previews, 6 changelog entries).
+Seeded catalog: 8 categories and 6 products (1 images, 2 model previews, 6 changelog entries) in 1234 ms.
 Customer, order, order-item, and download tables were not written.
 ```
+
+> Follow-up (see [`pr-10-catalog-seed-timeout-fix.md`](pr-10-catalog-seed-timeout-fix.md)):
+> the run reported here still used Prisma's default 5s interactive-transaction
+> timeout and failed with `P2028`; the seed now passes an explicit
+> `{ maxWait: 15_000, timeout: 60_000 }` budget, prints the elapsed time, and
+> reports failures with a sanitized code/message/metadata/hint block instead of
+> a bare error code. Everything else in this document still applies.
 
 Doing this without exposing credentials:
 

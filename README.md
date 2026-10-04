@@ -169,7 +169,10 @@ Two seeds project those fixtures: `npm run db:seed` additionally writes the demo
 customer, orders, and downloads (development only), while
 `npm run db:seed:catalog` writes only categories and products and is the command
 to populate a deployed catalog — see
-[`docs/pr-9-catalog-seed.md`](docs/pr-9-catalog-seed.md).
+[`docs/pr-9-catalog-seed.md`](docs/pr-9-catalog-seed.md). Its interactive
+transaction budget, the `P2028` timeout it fixes, and its secret-safe error
+reporting are documented in
+[`docs/pr-10-catalog-seed-timeout-fix.md`](docs/pr-10-catalog-seed-timeout-fix.md).
 The existing `Product` type in `src/types` still covers everything rendered
 (`images`, `modelPreviews`, `overview`, `features`, `requirements`,
 `includedFiles`, `installation`, `documentation`, `changelog`, `license`,
