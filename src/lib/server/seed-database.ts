@@ -1,39 +1,14 @@
 import "server-only";
 import type {
-  CategoryIcon as PrismaCategoryIcon,
   DownloadStatus as PrismaDownloadStatus,
   OrderStatus as PrismaOrderStatus,
   PrismaClient,
-  ProductType as PrismaProductType,
   ThemePreference as PrismaThemePreference,
 } from "@/generated/prisma/client";
 import type { MockOrderStatus } from "@/data/mock-account";
-import type { Product } from "@/types";
 import type { CustomerPreferences as SeedCustomerPreferences } from "@/types/account";
-import {
-  buildMarketplaceSeedData,
-  type MarketplaceSeedData,
-  type SeedProduct,
-} from "./seed-data";
-
-const CATEGORY_ICON_MAP: Record<string, PrismaCategoryIcon> = {
-  systems: "SYSTEMS",
-  "ui-kits": "UI_KITS",
-  "3d-assets": "ASSETS_3D",
-  vfx: "VFX",
-  audio: "AUDIO",
-  "developer-tools": "DEVELOPER_TOOLS",
-  templates: "TEMPLATES",
-  "complete-kits": "COMPLETE_KITS",
-};
-
-const PRODUCT_TYPE_MAP: Record<Product["type"], PrismaProductType> = {
-  system: "SYSTEM",
-  "ui-kit": "UI_KIT",
-  "starter-kit": "STARTER_KIT",
-  "model-pack": "MODEL_PACK",
-  "vfx-pack": "VFX_PACK",
-};
+import { buildMarketplaceSeedData, type MarketplaceSeedData } from "./seed-data";
+import { writeCatalog } from "./seed-catalog";
 
 const ORDER_STATUS_MAP: Record<MockOrderStatus, PrismaOrderStatus> = {
   complete: "COMPLETE",
@@ -51,16 +26,6 @@ const THEME_PREFERENCE_MAP: Record<
   system: "SYSTEM",
 };
 
-function categoryIcon(icon: string): PrismaCategoryIcon {
-  const mapped = CATEGORY_ICON_MAP[icon];
-  if (!mapped) throw new Error(`No database category icon mapping exists for ${icon}.`);
-  return mapped;
-}
-
-function productType(type: SeedProduct["type"]): PrismaProductType {
-  return PRODUCT_TYPE_MAP[type];
-}
-
 export interface SeedSummary {
   categories: number;
   products: number;
@@ -76,96 +41,9 @@ export async function seedMarketplace(
   data: MarketplaceSeedData = buildMarketplaceSeedData(),
 ): Promise<SeedSummary> {
   await prisma.$transaction(async (tx) => {
-    for (const category of data.categories) {
-      const fields = {
-        name: category.name,
-        slug: category.slug,
-        description: category.description,
-        icon: categoryIcon(category.icon),
-        sortOrder: category.sortOrder,
-      };
-      await tx.category.upsert({
-        where: { id: category.id },
-        create: { id: category.id, ...fields },
-        update: fields,
-      });
-    }
-
-    for (const product of data.products) {
-      const fields = {
-        slug: product.slug,
-        title: product.title,
-        description: product.description,
-        overview: product.overview,
-        price: product.price.toFixed(2),
-        type: productType(product.type),
-        version: product.version,
-        features: product.features,
-        requirements: product.requirements,
-        includedFiles: product.includedFiles,
-        installation: product.installation,
-        documentationSummary: product.documentation.summary,
-        documentationTopics: product.documentation.topics,
-        license: product.license,
-        releasedAt: new Date(`${product.releasedAt}T00:00:00.000Z`),
-        isFeatured: product.isFeatured,
-        isNew: product.isNew,
-        published: product.published,
-        sortOrder: product.sortOrder,
-        categoryId: product.categoryId,
-      };
-
-      await tx.product.upsert({
-        where: { id: product.id },
-        create: { id: product.id, ...fields },
-        update: fields,
-      });
-
-      await tx.productImage.deleteMany({
-        where: { productId: product.id, position: { gte: product.images.length } },
-      });
-      for (const [position, src] of product.images.entries()) {
-        const imageFields = { src, altText: null };
-        await tx.productImage.upsert({
-          where: { productId_position: { productId: product.id, position } },
-          create: { productId: product.id, position, ...imageFields },
-          update: imageFields,
-        });
-      }
-
-      const modelPreviews = product.modelPreviews ?? [];
-      await tx.productModelPreview.deleteMany({
-        where: { productId: product.id, position: { gte: modelPreviews.length } },
-      });
-      for (const [position, preview] of modelPreviews.entries()) {
-        const previewFields = {
-          src: preview.src,
-          label: preview.label,
-          description: preview.description,
-        };
-        await tx.productModelPreview.upsert({
-          where: { productId_position: { productId: product.id, position } },
-          create: { productId: product.id, position, ...previewFields },
-          update: previewFields,
-        });
-      }
-
-      await tx.productChangelogEntry.deleteMany({
-        where: { productId: product.id, position: { gte: product.changelog.length } },
-      });
-      for (const [position, entry] of product.changelog.entries()) {
-        const changelogFields = {
-          version: entry.version,
-          date: new Date(`${entry.date}T00:00:00.000Z`),
-          notes: entry.notes,
-        };
-        await tx.productChangelogEntry.upsert({
-          where: { productId_position: { productId: product.id, position } },
-          create: { productId: product.id, position, ...changelogFields },
-          update: changelogFields,
-        });
-      }
-    }
+    // Categories, products, and their media/changelog rows are written by the
+    // same catalog-only writer that the production catalog seed uses.
+    await writeCatalog(tx, data);
 
     // No passwordHash is written: the fixture customer stays signed-out-only,
     // and re-seeding must never overwrite a real credential.
