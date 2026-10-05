@@ -1,0 +1,275 @@
+/* Private creator-management surface. Intentionally small: this is an operator
+   tool, so it uses the global design tokens and one compact layout instead of a
+   storefront-style composition. */
+
+.page {
+  display: grid;
+  gap: clamp(1.5rem, 3vw, 2.25rem);
+  padding-block: clamp(2rem, 5vw, 3.5rem);
+}
+
+.header {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.eyebrow {
+  color: var(--accent-strong);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.header h1 {
+  font-size: clamp(1.6rem, 3.4vw, 2.1rem);
+}
+
+.description {
+  color: var(--text-muted);
+  max-width: 68ch;
+}
+
+.metaRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  padding: 0.2rem 0.6rem;
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.badgeOk {
+  border-color: rgba(95, 208, 162, 0.4);
+  color: var(--positive);
+}
+
+.badgeDraft {
+  border-color: var(--border);
+  color: var(--text-faint);
+}
+
+.notice {
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-start;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  padding: 0.8rem 1rem;
+  font-size: 0.92rem;
+}
+
+.noticeOk {
+  border-color: rgba(95, 208, 162, 0.35);
+}
+
+.noticeProblem {
+  border-color: rgba(249, 128, 128, 0.4);
+}
+
+.noticeIcon {
+  flex: none;
+  margin-top: 0.15rem;
+}
+
+.section {
+  display: grid;
+  gap: 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-raise);
+  padding: clamp(1rem, 2.5vw, 1.5rem);
+}
+
+.sectionHeader {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.sectionTitle {
+  font-size: 1.05rem;
+}
+
+.sectionDescription {
+  color: var(--text-faint);
+  font-size: 0.88rem;
+  max-width: 70ch;
+}
+
+.form {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.fieldGrid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr));
+}
+
+.field {
+  display: grid;
+  gap: 0.3rem;
+}
+
+.label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text-muted);
+}
+
+.input,
+.select,
+.textarea {
+  width: 100%;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.92rem;
+  padding: 0.5rem 0.65rem;
+}
+
+.textarea {
+  min-height: 5.5rem;
+  resize: vertical;
+}
+
+.formActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  align-items: center;
+}
+
+.inlineForm {
+  display: inline-flex;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+/* A stack of rows rather than a table: each row carries its own inline forms,
+   and the layout survives a narrow screen without a horizontal scroll. */
+.list {
+  display: grid;
+  gap: 0.6rem;
+  list-style: none;
+}
+
+.row {
+  display: grid;
+  gap: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  padding: 0.8rem 0.9rem;
+}
+
+.rowMain {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.titleCell {
+  display: grid;
+  gap: 0.2rem;
+  min-width: min(100%, 22rem);
+  flex: 1 1 18rem;
+}
+
+.titleText {
+  font-weight: 600;
+}
+
+.slugText {
+  color: var(--text-faint);
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+}
+
+.rowBadges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.priceText {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  min-width: 5rem;
+}
+
+.rowActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.disclosure {
+  border-top: 1px solid var(--border);
+  padding-top: 0.6rem;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.disclosureSummary {
+  cursor: pointer;
+  list-style: none;
+  color: var(--accent-strong);
+  font-size: 0.85rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.disclosureSummary::-webkit-details-marker {
+  display: none;
+}
+
+.muted {
+  color: var(--text-faint);
+  font-size: 0.85rem;
+}
+
+.warning {
+  display: grid;
+  gap: 0.4rem;
+  border-radius: var(--radius-md);
+  border: 1px dashed rgba(249, 128, 128, 0.45);
+  padding: 0.75rem 0.9rem;
+  color: var(--text-muted);
+  font-size: 0.88rem;
+}
+
+.emptyCell {
+  color: var(--text-faint);
+  font-size: 0.88rem;
+  padding: 0.6rem 0.5rem;
+}
+
+@media (max-width: 640px) {
+  .rowMain {
+    align-items: flex-start;
+  }
+}

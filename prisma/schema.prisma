@@ -46,6 +46,19 @@ enum ThemePreference {
   SYSTEM
 }
 
+/// Access levels for the private creator-management surface.
+///
+/// A grant is a `StaffMembership` row, never a column on `Customer`: signup,
+/// profile edits, and request bodies have no field that could express one, so
+/// an account cannot promote itself. Future creator-facing work (applications,
+/// creator profiles, per-creator product ownership) gets its own tables and
+/// its own privilege checks, and can never satisfy `StaffPrivilege` because
+/// those are resolved from this enum only.
+enum StaffRole {
+  OWNER
+  STAFF
+}
+
 model Category {
   id          String       @id @default(cuid())
   name        String
@@ -163,6 +176,33 @@ model Customer {
   downloads Download[]
   sessions  Session[]
   cartItems CartItem[]
+
+  /// Present only for explicitly authorized staff. `null` means "ordinary
+  /// customer", which is the state every newly registered account is in.
+  staffMembership         StaffMembership?  @relation("StaffMembershipHolder")
+  grantedStaffMemberships StaffMembership[] @relation("StaffMembershipGrantor")
+}
+
+/// One staff grant: which `Customer` may manage the marketplace, and how far.
+///
+/// Kept in its own table so a grant can be issued, audited, and revoked without
+/// touching the customer record, and so no user-facing write path can reach it.
+/// `grantedByCustomerId` records who issued it, so a second OWNER can never
+/// appear unexplained. It is null only for a row the bootstrap CLI wrote, where
+/// the actor is an operator with database access rather than a customer.
+model StaffMembership {
+  id                  String    @id @default(cuid())
+  customerId          String    @unique
+  role                StaffRole @default(STAFF)
+  grantedByCustomerId String?
+  createdAt           DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt           DateTime  @updatedAt @db.Timestamptz(3)
+
+  customer  Customer  @relation("StaffMembershipHolder", fields: [customerId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  grantedBy Customer? @relation("StaffMembershipGrantor", fields: [grantedByCustomerId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  @@index([role])
+  @@index([grantedByCustomerId])
 }
 
 /// Server-side session records. Only the SHA-256 hash of the opaque cookie

@@ -10,10 +10,14 @@ tools, templates, and complete starter kits.
 
 PRs #1 (marketplace foundation/design system), #2 (browsing/search/product
 pages/cart UI), #3 (Three.js previews), #4 (customer/account UI), #5
-(PostgreSQL + Prisma backend/database foundation), and #6 (real authentication,
-database-backed sessions, protected accounts) are merged. This branch contains
-the completed implementation for **PR #7 — database-backed cart and checkout
-foundation** and is ready for review; PR #7 is not yet merged:
+(PostgreSQL + Prisma backend/database foundation), #6 (real authentication,
+database-backed sessions, protected accounts), #7 (database-backed cart and
+checkout foundation), #8 (manual production-database migration workflow), #9
+(catalog-only production seed), #10 (seed timeout fix), and #11 (cached public
+catalog reads) are merged. This branch contains the completed implementation for
+**PR #12 — private creator management, Phase 1** and is ready for review; PR #12
+is not merged, not deployed, and its additive migration has not been applied to
+any database:
 
 - `/login` and `/register` are wired to a real backend. Registration creates a
   `Customer` row with a scrypt password digest; sign-in verifies it and issues an
@@ -45,6 +49,22 @@ foundation** and is ready for review; PR #7 is not yet merged:
 - **No payment is taken.** There is no payment provider, card collection,
   payment webhook, or simulated success endpoint; an unpaid order unlocks no
   download, and download buttons remain disabled placeholders.
+- **Product management is private.** `StaffRole` (`OWNER`/`STAFF`) and a
+  `StaffMembership` table record an explicit grant; the storefront and `/account`
+  are unchanged, and customer registration can never create or modify a grant.
+  Every product operation — list drafts, create, edit, publish, unpublish,
+  delete, grant, revoke — re-checks the derived privilege server-side, in the
+  Server Function and again in the service.
+- **`/manage` is the only protected surface in this phase:** a draft editor for
+  the commercial fields, publication toggles, and the owner-only staff directory.
+  It is dynamic, `noindex`, unlinked from the public chrome, and never shares the
+  public catalog cache; publishing or unpublishing expires that cache
+  immediately.
+- **The first owner is an operator action, never an accident.**
+  `npm run db:grant-owner` prints a dry run of exactly the addresses it was
+  handed, refuses one that is not a registered customer with a password, and
+  writes only with `--apply`. The first registered user is never promoted, and no
+  environment variable is consulted during a request.
 
 Account and cart data deliberately have **no** fixture fallback: without
 `DATABASE_URL`, `/login` and `/register` report that account services are
@@ -54,9 +74,12 @@ identity is ever rendered as if it were signed in.
 
 Not yet implemented (left for future PRs): payments and payment webhooks, secure
 downloads, tax/shipping/discount rules, cart merging on sign-in, email
-verification, password reset, login rate limiting, OAuth/social sign-in, admin
-and seller tooling, real production product imagery, reviews, and online
-documentation pages. See
+verification, password reset, login rate limiting, OAuth/social sign-in, the
+public creator application flow and the rest of the seller back office (media and
+asset uploads, changelog and documentation editing, moderation queues), real
+production product imagery, reviews, and online documentation pages. See
+[`docs/pr-12-staff-authorization.md`](docs/pr-12-staff-authorization.md) for the
+staff authorization model, the owner bootstrap, and the rollout steps,
 [`docs/pr-7-cart-checkout.md`](docs/pr-7-cart-checkout.md) for the cart and
 checkout architecture,
 [`docs/pr-6-authentication.md`](docs/pr-6-authentication.md) for the
@@ -98,7 +121,10 @@ unavailable until PostgreSQL is reachable, migrated, and seeded. See the
 and [`docs/pr-6-authentication.md`](docs/pr-6-authentication.md) for the
 authentication design.
 
-Open [http://localhost:3000](http://localhost:3000).
+Open [http://localhost:3000](http://localhost:3000). Product management at
+`/manage` is a separate, private matter: it needs a `StaffMembership` grant, and
+the first owner is created by hand — see
+[Private creator management](#private-creator-management-pr-12).
 
 ## Scripts
 
@@ -115,6 +141,7 @@ Open [http://localhost:3000](http://localhost:3000).
 | `npm run db:deploy`             | Apply committed migrations in deployment environments              |
 | `npm run db:seed`               | Idempotently seed the existing marketplace/demo fixture values     |
 | `npm run db:seed:catalog`       | Idempotently seed only categories/products (no demo account records) |
+| `npm run db:grant-owner`        | Review (`dry run`) or write (`--apply`) the initial OWNER grant; requires `DATABASE_URL` |
 | `npm run db:studio`             | Open Prisma Studio against `DATABASE_URL`                          |
 
 ## Routes
@@ -132,29 +159,33 @@ Open [http://localhost:3000](http://localhost:3000).
 | `/account/downloads` | The customer's own library; download controls are disabled placeholders |
 | `/account/settings` | Profile and preferences, persisted for the signed-in customer |
 | `/checkout`       | The signed-in customer's cart review and order submission (payment not enabled) |
+| `/manage`           | Private product management (drafts, publish/unpublish, delete, staff grants). Requires an explicit `StaffMembership` grant; no public link, `noindex`, never cached |
 
 ## Project structure
 
 ```
 prisma/
-├── schema.prisma          # PostgreSQL marketplace/account/session data model
-├── migrations/            # Reproducible schema migrations (init + auth + cart/checkout)
+├── schema.prisma          # PostgreSQL marketplace/account/session/staff data model
+├── migrations/            # Reproducible schema migrations (init + auth + cart/checkout + staff access)
 ├── seed.ts                # Idempotent fixture-based demo seed (catalog + demo account)
 ├── seed-catalog.ts        # Catalog-only production seed (validates DATABASE_URL first)
-└── seed-catalog-runner.ts # Catalog-only seed runner (loads the generated client)
+├── seed-catalog-runner.ts # Catalog-only seed runner (loads the generated client)
+├── grant-owner.ts         # Initial-owner bootstrap CLI (dry run by default; refuses, never promotes silently)
+└── grant-owner-runner.ts  # Bootstrap writer (the only importer of the confirmation literal)
 src/
 ├── app/                    # Routes, layout, global styles
 │   ├── products/           # DB-backed catalog + product detail routes
 │   ├── account/            # Session-protected customer account pages
 │   ├── checkout/           # Cart review + unpaid order submission (protected)
+│   ├── manage/             # Private product management (staff-authorized, dynamic, noindex)
 │   ├── login/              # Sign-in screen (posts to a Server Function)
 │   ├── register/           # Registration screen (posts to a Server Function)
 │   ├── globals.css         # Design tokens & layout primitives
 │   ├── layout.tsx          # Shell: header, main, footer
 │   └── page.tsx            # Homepage composition
-├── components/              # Marketplace, account, cart, checkout and 3D UI
+├── components/              # Marketplace, account, cart, checkout, manage and 3D UI
 ├── data/                    # Catalog fixtures, account/order seed values, no-DB catalog fallback
-├── lib/server/              # Server-only Prisma client, data access, auth, cart/checkout, seeding
+├── lib/server/              # Server-only Prisma client, data access, auth, cart/checkout, staff authorization, product administration, seeding
 ├── lib/                     # Catalog search/sort, account states, form contracts, money, cart store
 └── types/                   # Shared catalog and account read types
 ```
@@ -173,6 +204,10 @@ to populate a deployed catalog — see
 transaction budget, the `P2028` timeout it fixes, and its secret-safe error
 reporting are documented in
 [`docs/pr-10-catalog-seed-timeout-fix.md`](docs/pr-10-catalog-seed-timeout-fix.md).
+Neither seed writes a `StaffMembership` row: `db:seed`'s demo customer stays an
+ordinary customer (it has no password, so it cannot even sign in), and no seed
+path can promote an account — see
+[Private creator management](#private-creator-management-pr-12).
 The existing `Product` type in `src/types` still covers everything rendered
 (`images`, `modelPreviews`, `overview`, `features`, `requirements`,
 `includedFiles`, `installation`, `documentation`, `changelog`, `license`,
@@ -278,6 +313,61 @@ total, and final payment calculations arrive with the payment integration.
 
 The scope of this PR stops at the cart and the checkout foundation; the deferred
 work is listed once, under **Status**.
+
+## Private creator management (PR #12)
+
+At launch, creating and managing marketplace products is limited to the owner and
+the staff an owner has explicitly authorized. Registering a customer account is
+unchanged and open to anyone; there is no public creator application and no
+creator self-service. Five things make that rule real rather than cosmetic:
+
+1. **A grant is its own table, not a user field.** `StaffRole` (`OWNER`, `STAFF`)
+   and `StaffMembership` (`customerId @unique`, `role`, `grantedByCustomerId`)
+   were added to the schema; `Customer` has no role column. Registration, profile
+   editing, cart, and checkout only ever write `Customer` columns, so there is
+   nothing for a signup request, a profile form, a query parameter, or client
+   state to write. An ordinary customer is exactly an account with no membership
+   row — the default, not a flag to remember to set.
+2. **Privileges are derived from the role, and the role comes from the session.**
+   `src/lib/server/staff-core.ts` maps `staff`/`owner` onto
+   `products:view | products:manage | products:delete | staff:manage` (only owners
+   manage staff). A stored role the policy does not know grants nothing, and a role
+   can only ever be defaulted *downward* to `staff`.
+3. **The check runs where the write happens.** `/manage` and every Server
+   Function under it gate on `requireStaffAccess()` / `authorizeStaffAction()`,
+   and both services call the same privilege check again at the top of every
+   method, so a direct call to `productAdmin.deleteProduct(…)` with an
+   unauthorized actor is refused before a query runs. Hiding the buttons is not
+   what protects anything; there is no shared staff password, secret, or cookie
+   flag involved at all.
+4. **The first owner is bootstrapped by an operator, never automatically.**
+   `npm run db:grant-owner -- --email you@example.com` validates `DATABASE_URL`
+   first, prints a dry run of exactly the addresses it was handed, and refuses one
+   that is not a registered customer with a password; `--apply` writes. The first
+   registered user is never promoted, `MARKETPLACE_OWNER_EMAILS` is read only by
+   that command (never during a request), and later grants come from the owner-only
+   staff panel so each one records its grantor. `Owner` and `Staff` both re-enter
+   the same guard: the last remaining owner cannot be demoted or revoked, because
+   the count and the write share one transaction.
+5. **Private reads never enter the public cache.** `data-access-core.ts` still
+   hardcodes `published: true` for the storefront, `/manage` reads through the
+   staff-scoped service with no `unstable_cache`, and the access lookup is
+   memoized per request with `cache()` only. Publishing or unpublishing calls
+   `updateTag("catalog")`, so the storefront changes on the next request rather
+   than within a TTL.
+
+The management surface is the minimum that proves the model: draft creation
+(always unpublished, validated server-side, duplicate slugs refused), editing the
+commercial fields, publication toggles, deletion that refuses any product an
+order, download, or cart line still references (unpublishing is the supported way
+to retire a sold product), and the owner-only staff directory. `noindex`, dynamic,
+and unlinked from the public chrome. Creator applications, creator-owned product
+permissions, media/asset uploads, and moderation queues arrive on these same
+privilege names in later phases — a `StaffRole` that cannot be `CREATOR` is the
+point, not an oversight. See
+[`docs/pr-12-staff-authorization.md`](docs/pr-12-staff-authorization.md) for the
+full model, the migration status (additive, **not applied anywhere yet**), and the
+rollout and rollback steps.
 
 ## 3D previews
 
