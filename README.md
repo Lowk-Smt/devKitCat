@@ -30,9 +30,13 @@ any database:
   orders, download records, and preferences are read by that customer's ID, so
   another customer's order ID resolves to a 404 instead of their data. Their
   layout, collection states, and styling are unchanged.
-- `/` and the marketplace/product routes read products and categories through a
-  server-only data-access layer when `DATABASE_URL` is configured. Without it,
-  the existing catalog fixtures remain a database-free preview fallback.
+- `/` (including the `/#categories` section) and the marketplace/product routes
+  read products and categories through a server-only data-access layer when
+  `DATABASE_URL` is configured, and share the cached catalog reads in
+  `src/lib/server/catalog-cache.ts` (tag `catalog`, revalidated every 60
+  seconds and on every product-management write) so repeat renders skip the
+  database round trip. Without it, the existing catalog fixtures remain a
+  database-free preview fallback.
 - The marketplace UI remains client-interactive: search, category filters,
   sorting, result counts, cards, product detail, related products, galleries,
   and 3D previews keep their existing component contracts.
