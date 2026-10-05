@@ -7,17 +7,17 @@ import { listCategories, listProducts } from "./data-access";
 /**
  * Cached reads for the **public** marketplace catalog.
  *
- * Every marketplace render (`/`, `/products`, product detail) used to run its
- * own Prisma round trips against Neon on each request, so navigating to
- * `/products` paid the full remote-database latency every single time. The
- * catalog is the same for every visitor and only changes when it is reseeded,
- * which makes it safe to cache server-side.
+ * The homepage (including /#categories) and /products share these entries
+ * instead of repeating Prisma round trips on every request. The public catalog
+ * is the same for every visitor, so it is safe to cache server-side.
  *
  * This project does not use Cache Components (`cacheComponents` is not
- * enabled), so this stays on the previous caching model with `unstable_cache`:
- * an in-memory entry shared across requests, revalidated after a short TTL.
- * The 60 second window bounds how long a freshly seeded catalog can lag while
- * still removing the database round trip from nearly every marketplace render.
+ * enabled), so it reuses `unstable_cache` and Next.js' persistent Data Cache.
+ * Entries become stale after 60 seconds; the next request can serve the stale
+ * value while refreshing in the background. This is not a hard freshness cap
+ * for out-of-band changes such as seeds, especially if a refresh fails.
+ * Successful product-management actions already call updateTag(CATALOG_CACHE_TAG)
+ * to expire both entries immediately, making the next read wait for fresh data.
  *
  * Customer-scoped reads (orders, downloads, cart) live in
  * `src/lib/server/auth.ts` + `src/lib/server/data-access.ts` and are
@@ -25,7 +25,7 @@ import { listCategories, listProducts } from "./data-access";
  */
 export const CATALOG_CACHE_TAG = "catalog";
 
-/** How long a cached catalog read may be served before it is refreshed. */
+/** How long a catalog entry stays fresh before request-triggered revalidation. */
 export const CATALOG_REVALIDATE_SECONDS = 60;
 
 const CACHE_OPTIONS: { tags: string[]; revalidate: number } = {
@@ -40,7 +40,7 @@ export const getCachedProducts = unstable_cache(
   CACHE_OPTIONS,
 );
 
-/** The category list that backs the marketplace filter chips. */
+/** The category list shared by homepage cards and marketplace filter chips. */
 export const getCachedCategories = unstable_cache(
   async () => listCategories(),
   ["devkitcat-catalog-categories"],
