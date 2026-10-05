@@ -231,3 +231,58 @@ test("guard fails closed when required safety info is missing or mismatched", ()
     assert.equal(isScratchOverrideValid(prod), false);
   });
 });
+
+test("regression: explicit scratch host ep-sweet-surf-azojjdxn allows probable-Neon verification (issue observed locally)", () => {
+  // Exact host observed locally: ep-sweet-surf-azojjdxn.c-3.ap-southeast-1.aws.neon.tech
+  // User set VERIFY_MIGRATION_SCRATCH_DB=true + VERIFY_MIGRATION_SCRATCH_HOST=ep-sweet-surf-azojjdxn
+  // Expected: isProbablyProductionUrl=true, isScratchOverrideValid=true, shouldAllow=true
+  const realNeonScratch = "postgresql://neondb_owner:npg_fake@ep-sweet-surf-azojjdxn.c-3.ap-southeast-1.aws.neon.tech/neondb?sslmode=require";
+  // Also test pooler variant
+  const realNeonScratchPooler = "postgresql://neondb_owner:npg_fake@ep-sweet-surf-azojjdxn-pooler.c-3.ap-southeast-1.aws.neon.tech/neondb?sslmode=require";
+
+  for (const url of [realNeonScratch, realNeonScratchPooler]) {
+    // Without override → production, rejected
+    withCleanScratchEnv(() => {
+      assert.equal(isProbablyProductionUrl(url), true, `expected production for ${getUrlHost(url)}`);
+      assert.equal(isScratchOverrideValid(url), false);
+      assert.equal(shouldAllowRealVerification(url), false);
+    });
+    // Flag alone → still rejected (fail-closed)
+    withEnv({ VERIFY_MIGRATION_SCRATCH_DB: "true" }, () => {
+      assert.equal(isScratchOverrideValid(url), false);
+      assert.equal(shouldAllowRealVerification(url), false);
+    });
+    // Correct host → allowed
+    withEnv({ VERIFY_MIGRATION_SCRATCH_DB: "true", VERIFY_MIGRATION_SCRATCH_HOST: "ep-sweet-surf-azojjdxn" }, () => {
+      assert.equal(getUrlHost(url), url.includes("pooler") ? "ep-sweet-surf-azojjdxn-pooler.c-3.ap-southeast-1.aws.neon.tech" : "ep-sweet-surf-azojjdxn.c-3.ap-southeast-1.aws.neon.tech");
+      assert.equal(isProbablyProductionUrl(url), true);
+      assert.equal(isScratchOverrideValid(url), true, `expected override valid for ${url} with host ep-sweet-surf-azojjdxn`);
+      assert.equal(shouldAllowRealVerification(url), true);
+    });
+    // Wrong host → rejected
+    withEnv({ VERIFY_MIGRATION_SCRATCH_DB: "true", VERIFY_MIGRATION_SCRATCH_HOST: "ep-wrong-host" }, () => {
+      assert.equal(isScratchOverrideValid(url), false);
+      assert.equal(shouldAllowRealVerification(url), false);
+    });
+    // Case-insensitive and full-host also works
+    withEnv({ VERIFY_MIGRATION_SCRATCH_DB: "TRUE", VERIFY_MIGRATION_SCRATCH_HOST: "EP-SWEET-SURF-AZOJJDXN" }, () => {
+      assert.equal(isScratchOverrideValid(url), true);
+    });
+    withEnv({ VERIFY_MIGRATION_SCRATCH_DB: "true", VERIFY_MIGRATION_SCRATCH_HOST: getUrlHost(url) }, () => {
+      assert.equal(isScratchOverrideValid(url), true);
+    });
+  }
+
+  // Normal production URL must still be rejected even with correct scratch host for *other* DB
+  const otherProd = "postgresql://user:pass@ep-other-prod-999.c-2.us-east-1.aws.neon.tech/neondb";
+  withEnv({ VERIFY_MIGRATION_SCRATCH_DB: "true", VERIFY_MIGRATION_SCRATCH_HOST: "ep-sweet-surf-azojjdxn" }, () => {
+    assert.equal(isProbablyProductionUrl(otherProd), true);
+    assert.equal(isScratchOverrideValid(otherProd), false);
+    assert.equal(shouldAllowRealVerification(otherProd), false);
+  });
+
+  // Local/non-Neon unchanged
+  withCleanScratchEnv(() => {
+    assert.equal(shouldAllowRealVerification("postgresql://postgres:postgres@localhost:5432/devkitcat"), true);
+  });
+});
