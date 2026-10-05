@@ -1,7 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { AppLink } from "@/components/ui/AppLink";
 import { useEffect, useState } from "react";
 import { CartButton } from "@/components/cart/CartButton";
 import { Button } from "@/components/ui/Button";
@@ -42,7 +42,7 @@ export function Header() {
   return (
     <header className={styles.header}>
       <div className={cx("container", styles.inner)}>
-        <Link
+        <AppLink
           href="/"
           className={styles.brand}
           aria-label="devKitCat — home"
@@ -50,11 +50,11 @@ export function Header() {
         >
           <Logo size={28} />
           <span className={styles.wordmark}>devKitCat</span>
-        </Link>
+        </AppLink>
 
         <nav className={styles.desktopNav} aria-label="Main navigation">
           {NAV_LINKS.map((link) => (
-            <Link
+            <AppLink
               key={link.href}
               href={link.href}
               className={cx(
@@ -64,7 +64,7 @@ export function Header() {
               aria-current={isActive(link.href) ? "page" : undefined}
             >
               {link.label}
-            </Link>
+            </AppLink>
           ))}
           <span className={styles.navPlaceholder}>
             Documentation
@@ -98,7 +98,7 @@ export function Header() {
         >
           <div className={cx("container", styles.mobileNavInner)}>
             {NAV_LINKS.map((link) => (
-              <Link
+              <AppLink
                 key={link.href}
                 href={link.href}
                 className={cx(
@@ -109,7 +109,7 @@ export function Header() {
                 onClick={() => setMenuOpen(false)}
               >
                 {link.label}
-              </Link>
+              </AppLink>
             ))}
             <span className={cx(styles.mobileNavLink, styles.navPlaceholder)}>
               Documentation

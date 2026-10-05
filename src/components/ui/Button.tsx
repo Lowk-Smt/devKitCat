@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { AppLink } from "@/components/ui/AppLink";
 import type { ReactNode } from "react";
 import { cx } from "@/lib/cx";
 import styles from "./Button.module.css";
@@ -46,14 +46,14 @@ export function Button({
 
   if (href) {
     return (
-      <Link
+      <AppLink
         href={href}
         className={classes}
         aria-label={ariaLabel}
         onClick={onClick}
       >
         {children}
-      </Link>
+      </AppLink>
     );
   }
 
