@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { AppLink } from "@/components/ui/AppLink";
 import { Logo } from "@/components/layout/Logo";
 import { cx } from "@/lib/cx";
 import styles from "./Footer.module.css";
@@ -28,9 +28,9 @@ export function Footer() {
             <ul className={styles.linkList}>
               {MARKETPLACE_LINKS.map((link) => (
                 <li key={link.href}>
-                  <Link href={link.href} className={styles.link}>
+                  <AppLink href={link.href} className={styles.link}>
                     {link.label}
-                  </Link>
+                  </AppLink>
                 </li>
               ))}
             </ul>
