@@ -38,6 +38,29 @@ import {
  *   role-shaped object;
  * * an unrecognized role value fails closed (`createStaffAccess` returns null),
  *   so neither a corrupted row nor a future enum member implies access.
+ *
+ * Concurrency safety (why SERIALIZABLE):
+ *
+ * The invariant is “at least one OWNER must remain”. Without protection, two
+ * concurrent revocations (or demotions) can each read ownerCount=2, both decide
+ * “losing one owner is safe”, and both delete, leaving 0.
+ *
+ * All owner-changing mutations (grant OWNER, demote OWNER→STAFF, revoke OWNER,
+ * bootstrap OWNER) therefore run inside a PostgreSQL SERIALIZABLE transaction.
+ * Under SERIALIZABLE, the database detects the read-write dependency between the
+ * two concurrent “count owners” reads and the subsequent writes and aborts one
+ * transaction with a serialization failure (PostgreSQL 40001 / Prisma P2034).
+ * The aborted transaction is retried (up to 3 attempts) and then sees the
+ * updated count (1) and correctly returns LAST_OWNER. If the transaction would
+ * still violate the invariant after retry, it fails closed rather than writing.
+ *
+ * SERIALIZABLE is preferred over ad-hoc row locking because it protects the
+ * predicate (“how many owners exist?”) rather than a single row — the race is
+ * on the count, not on one membership row — and it composes correctly with the
+ * existing upsert/deleteMany patterns without requiring manual SELECT … FOR
+ * UPDATE or advisory locks. The retry is bounded and invisible to callers: a
+ * LAST_OWNER or other business failure is returned, a serialization failure
+ * after retries becomes a generic ERROR with a safe code.
  */
 
 /** The projection a decision needs. Identity columns only, and no credentials. */
@@ -210,6 +233,47 @@ function mapDirectoryRow(row: DirectoryRow): StaffMembershipView | null {
   };
 }
 
+// ---------------------------------------------------------------------------
+// Concurrency helpers: SERIALIZABLE + retry
+// ---------------------------------------------------------------------------
+
+/** Prisma P2034 or PostgreSQL 40001/40P01 indicate a serialization/deadlock that is safe to retry. */
+const SERIALIZATION_FAILURE_CODES = new Set(["P2034", "40001", "40P01"]);
+const SERIALIZABLE_MAX_RETRIES = 3;
+
+function isSerializationFailure(error: unknown): boolean {
+  if (typeof error !== "object" || error === null) return false;
+  const code =
+    "code" in error && typeof (error as { code?: unknown }).code === "string"
+      ? (error as { code: string }).code
+      : null;
+  if (code && SERIALIZATION_FAILURE_CODES.has(code)) return true;
+  const message =
+    "message" in error && typeof (error as { message?: unknown }).message === "string"
+      ? (error as { message: string }).message
+      : "";
+  // Fallback: some drivers surface the SQLSTATE in the message.
+  return /40001|40P01|P2034|serialization failure|deadlock|could not serialize/i.test(message);
+}
+
+async function withSerializableRetry<T>(operation: () => Promise<T>): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < SERIALIZABLE_MAX_RETRIES; attempt += 1) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error;
+      if (isSerializationFailure(error) && attempt < SERIALIZABLE_MAX_RETRIES - 1) {
+        // Small backoff to reduce contention; bounded and deterministic for tests.
+        await new Promise((resolve) => setTimeout(resolve, 10 * (attempt + 1)));
+        continue;
+      }
+      throw error;
+    }
+  }
+  throw lastError;
+}
+
 /**
  * Builds the staff-authorization service around a Prisma client provider.
  *
@@ -320,8 +384,16 @@ export function createStaffAccessService(
   }
 
   /**
-   * Grant or replace a membership inside one transaction, so the owner count
-   * that the last-owner guard read is the count it acted on.
+   * Grant or replace a membership inside one SERIALIZABLE transaction, so the
+   * owner count that the last-owner guard read is the count it acted on.
+   *
+   * With SERIALIZABLE, two concurrent transactions that each read ownerCount=2
+   * and then try to demote a different owner are detected as a serialization
+   * anomaly: PostgreSQL aborts one with 40001 (Prisma surfaces as P2034). The
+   * retry re-reads the count (now 1) and correctly returns LAST_OWNER, so the
+   * system never reaches zero owners. The retry is bounded (3 attempts) and
+   * does not leak the serialization code to callers — a persistent conflict
+   * becomes a generic ERROR.
    *
    * `actor` is null only for the bootstrap path, which is separately gated on the
    * confirmation literal and records no grantor.
@@ -339,74 +411,87 @@ export function createStaffAccessService(
     const grantedByCustomerId = input.actor ? input.actor.customerId : null;
 
     try {
-      return await client.$transaction(async (tx) => {
-        const customer: GrantTargetRow | null = await findGrantTarget(tx, input.email);
-        if (!customer) return failure("NOT_FOUND");
+      return await withSerializableRetry(() =>
+        // Prisma 7 supports { isolationLevel: 'Serializable' }; the in-memory
+        // test stub ignores the options object, which keeps the test suite
+        // runnable without a real database while the production path gets the
+        // stronger guarantee.
+        (client.$transaction as (fn: (tx: TransactionClient) => Promise<StaffResult<GrantMembershipOutcome>>, opts?: unknown) => Promise<StaffResult<GrantMembershipOutcome>>)(
+          async (tx) => {
+            const customer: GrantTargetRow | null = await findGrantTarget(tx, input.email);
+            if (!customer) return failure("NOT_FOUND");
 
-        const existing = await tx.staffMembership.findUnique({
-          where: { customerId: customer.id },
-          select: MEMBERSHIP_SELECT,
-        });
-        const currentRole = existing ? roleFromColumn(existing.role) : null;
+            const existing = await tx.staffMembership.findUnique({
+              where: { customerId: customer.id },
+              select: MEMBERSHIP_SELECT,
+            });
+            const currentRole = existing ? roleFromColumn(existing.role) : null;
 
-        const decision = evaluateMembershipChange({
-          actor: input.actor,
-          currentRole,
-          requestedRole: input.role,
-          ownerCount: await countOwners(tx),
-          bootstrap: input.bootstrap === true,
-        });
-        if (!decision.ok) return failure(decision.code);
+            const decision = evaluateMembershipChange({
+              actor: input.actor,
+              currentRole,
+              requestedRole: input.role,
+              ownerCount: await countOwners(tx),
+              bootstrap: input.bootstrap === true,
+            });
+            if (!decision.ok) return failure(decision.code);
 
-        if (currentRole === input.role) {
-          // Idempotent: a repeated grant leaves the audit row and timestamps as
-          // they are and reports that nothing changed.
-          return {
-            ok: true as const,
-            value: {
-              customerId: customer.id,
-              email: customer.email,
-              name: customer.name,
-              role: input.role,
-              grantedAt: existing!.createdAt,
-              bootstrapped: existing!.grantedByCustomerId === null,
-              alreadyGranted: true,
-              canSignIn: typeof customer.passwordHash === "string",
-            },
-          };
-        }
+            if (currentRole === input.role) {
+              // Idempotent: a repeated grant leaves the audit row and timestamps as
+              // they are and reports that nothing changed.
+              return {
+                ok: true as const,
+                value: {
+                  customerId: customer.id,
+                  email: customer.email,
+                  name: customer.name,
+                  role: input.role,
+                  grantedAt: existing!.createdAt,
+                  bootstrapped: existing!.grantedByCustomerId === null,
+                  alreadyGranted: true,
+                  canSignIn: typeof customer.passwordHash === "string",
+                },
+              };
+            }
 
-        // `customerId` is unique, so this replaces the role instead of stacking a
-        // second, contradicting grant on the same account.
-        const saved = await tx.staffMembership.upsert({
-          where: { customerId: customer.id },
-          create: {
-            customerId: customer.id,
-            role: STAFF_ROLE_COLUMN[input.role],
-            grantedByCustomerId,
+            // `customerId` is unique, so this replaces the role instead of stacking a
+            // second, contradicting grant on the same account.
+            const saved = await tx.staffMembership.upsert({
+              where: { customerId: customer.id },
+              create: {
+                customerId: customer.id,
+                role: STAFF_ROLE_COLUMN[input.role],
+                grantedByCustomerId,
+              },
+              update: {
+                role: STAFF_ROLE_COLUMN[input.role],
+                grantedByCustomerId,
+              },
+              select: MEMBERSHIP_SELECT,
+            });
+
+            return {
+              ok: true as const,
+              value: {
+                customerId: customer.id,
+                email: customer.email,
+                name: customer.name,
+                role: input.role,
+                grantedAt: saved.createdAt,
+                bootstrapped: grantedByCustomerId === null,
+                alreadyGranted: false,
+                canSignIn: typeof customer.passwordHash === "string",
+              },
+            };
           },
-          update: {
-            role: STAFF_ROLE_COLUMN[input.role],
-            grantedByCustomerId,
-          },
-          select: MEMBERSHIP_SELECT,
-        });
-
-        return {
-          ok: true as const,
-          value: {
-            customerId: customer.id,
-            email: customer.email,
-            name: customer.name,
-            role: input.role,
-            grantedAt: saved.createdAt,
-            bootstrapped: grantedByCustomerId === null,
-            alreadyGranted: false,
-            canSignIn: typeof customer.passwordHash === "string",
-          },
-        };
-      });
+          { isolationLevel: "Serializable" },
+        ),
+      );
     } catch (error) {
+      if (isSerializationFailure(error)) {
+        logger("staff grant write", getSafeErrorCode(error));
+        return failure("ERROR");
+      }
       logger("staff grant write", getSafeErrorCode(error));
       return failure("ERROR");
     }
@@ -437,33 +522,48 @@ export function createStaffAccessService(
     if (!requested) return failure("INVALID_INPUT");
 
     try {
-      const customer = await findGrantTarget(gate.client, requested);
-      if (!customer) return failure("NOT_FOUND");
+      return await withSerializableRetry(() =>
+        (gate.client.$transaction as (fn: (tx: TransactionClient) => Promise<StaffResult<{ revoked: boolean }>>, opts?: unknown) => Promise<StaffResult<{ revoked: boolean }>>)(
+          async (tx) => {
+            const customer = await findGrantTarget(tx, requested);
+            if (!customer) return failure("NOT_FOUND");
 
-      const existing = await gate.client.staffMembership.findUnique({
-        where: { customerId: customer.id },
-        select: MEMBERSHIP_SELECT,
-      });
-      if (!existing) return failure("NOT_FOUND");
+            const existing = await tx.staffMembership.findUnique({
+              where: { customerId: customer.id },
+              select: MEMBERSHIP_SELECT,
+            });
+            if (!existing) return failure("NOT_FOUND");
 
-      const decision = evaluateMembershipChange({
-        actor,
-        currentRole: roleFromColumn(existing.role),
-        requestedRole: null,
-        ownerCount: await countOwners(gate.client),
-      });
-      if (!decision.ok) return failure(decision.code);
+            const decision = evaluateMembershipChange({
+              actor,
+              currentRole: roleFromColumn(existing.role),
+              requestedRole: null,
+              ownerCount: await countOwners(tx),
+            });
+            if (!decision.ok) return failure(decision.code);
 
-      // The delete key repeats the `customerId` that was just verified, so the
-      // row this checked is the row that goes away.
-      const deleted = await gate.client.staffMembership.deleteMany({
-        where: { customerId: customer.id },
-      });
+            // The delete key repeats the `customerId` that was just verified, so the
+            // row this checked is the row that goes away. The count check and the
+            // delete are in the same SERIALIZABLE transaction, so two concurrent
+            // revocations cannot both see ownerCount=2 and both delete — one
+            // transaction is aborted with a serialization failure and, on retry,
+            // sees count=1 and returns LAST_OWNER.
+            const deleted = await tx.staffMembership.deleteMany({
+              where: { customerId: customer.id },
+            });
 
-      return { ok: true, value: { revoked: deleted.count > 0 } };
+            return { ok: true, value: { revoked: deleted.count > 0 } };
+          },
+          { isolationLevel: "Serializable" },
+        ),
+      );
     } catch (error) {
       const code = getSafeErrorCode(error);
       if (code === RECORD_NOT_FOUND_CODE) return failure("NOT_FOUND");
+      if (isSerializationFailure(error)) {
+        logger("staff revoke write", code);
+        return failure("ERROR");
+      }
 
       logger("staff revoke write", code);
       return failure("ERROR");
