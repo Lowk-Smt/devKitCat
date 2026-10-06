@@ -150,7 +150,12 @@ export function CartDrawer() {
               </p>
 
               {isAuthenticated === true ? (
-                <Button href="/checkout" fullWidth disabled={isPending}>
+                <Button
+                  href="/checkout"
+                  fullWidth
+                  disabled={isPending}
+                  onClick={close}
+                >
                   Review &amp; checkout
                 </Button>
               ) : isAuthenticated === false ? (
