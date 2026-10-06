@@ -570,29 +570,34 @@ export function createCartService(
       // with the same idempotency key resolves to its original order (and
       // `alreadyPlaced: true`) above, before the transaction, so an order can
       // never be notified twice.
-      if (validatedPhone || validatedName) {
-        try {
-          const customerRow = await client.customer
-            .findUnique({
-              where: { id: customerId },
-              select: { email: true, name: true },
-            })
-            .catch(() => null);
+      // Every newly created order must get a notification attempt. Do not gate
+      // this on optional contact fields: the order is the event, and those
+      // fields are not a prerequisite for Telegram delivery.
+      try {
+        const customerRow = await client.customer
+          .findUnique({
+            where: { id: customerId },
+            select: { email: true, name: true },
+          })
+          .catch(() => null);
 
-          await notifier({
-            orderId: placed.orderId,
-            customerName: placed.customerName || customerRow?.name || "Customer",
-            customerEmail: customerRow?.email || "N/A",
-            customerPhone: validatedPhone || "N/A",
-            telegramHandle: placed.telegramHandle,
-            items: placed.notificationItems,
-            total: priceCentsToDecimalString(placed.totalCents),
-            currency: CART_CURRENCY,
-            status: "PENDING PAYMENT",
-          }).catch(() => undefined);
-        } catch {
-          // Failure in notification is strictly non-blocking
-        }
+        const notification = {
+          orderId: placed.orderId,
+          customerName: placed.customerName || customerRow?.name || "Customer",
+          customerEmail: customerRow?.email || "N/A",
+          customerPhone: validatedPhone || "N/A",
+          telegramHandle: placed.telegramHandle,
+          items: placed.notificationItems,
+          total: priceCentsToDecimalString(placed.totalCents),
+          currency: CART_CURRENCY,
+          status: "PENDING PAYMENT",
+        } satisfies TelegramOrderNotification;
+
+        await notifier(notification);
+      } catch (error) {
+        // Failure in notification is strictly non-blocking, but retain a safe
+        // production diagnostic rather than silently discarding the failure.
+        logger("telegram notification", getSafeErrorCode(error));
       }
 
       return {

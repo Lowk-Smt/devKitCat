@@ -370,6 +370,33 @@ test("10. $0.00 valid cart creates an order instead of CART_EMPTY", async () => 
   assert.equal(order.status, "PENDING_PAYMENT");
 });
 
+test("10b. Every newly created order invokes Telegram without optional contact fields", async () => {
+  const db = createMockDb();
+  db.cartItems.set("cart_1", {
+    id: "cart_1",
+    customerId: CUSTOMER_A,
+    productId: "prod-paid-1",
+    quantity: 1,
+  });
+
+  let calls = 0;
+  const service = createCartService(
+    () => db.client,
+    () => {},
+    async () => {
+      calls += 1;
+    },
+  );
+
+  const result = await service.placeOrder(CUSTOMER_A, {
+    idempotencyKey: generateOrderIdempotencyKey(),
+    reviewedSubtotalCents: 1500,
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(calls, 1, "a newly created order must always invoke Telegram");
+});
+
 test("11. Duplicate submission / idempotency key returns the original order", async () => {
   const db = createMockDb();
   db.cartItems.set("cart_1", {
