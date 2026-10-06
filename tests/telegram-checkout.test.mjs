@@ -401,6 +401,47 @@ test("11. Duplicate submission / idempotency key returns the original order", as
   assert.equal(second.value.orderId, first.value.orderId);
 });
 
+test("11b. A retried submission never sends a second Telegram notification", async () => {
+  const db = createMockDb();
+  db.cartItems.set("cart_1", {
+    id: "cart_1",
+    customerId: CUSTOMER_A,
+    productId: "prod-paid-1",
+    quantity: 1,
+  });
+
+  const notifications = [];
+  const service = createCartService(
+    () => db.client,
+    () => {},
+    async (notification) => {
+      notifications.push(notification);
+    },
+  );
+
+  const idempotencyKey = generateOrderIdempotencyKey();
+  const first = await service.placeOrder(CUSTOMER_A, {
+    idempotencyKey,
+    reviewedSubtotalCents: 1500,
+    customerPhone: "+15551234567",
+  });
+  assert.equal(first.ok, true);
+  assert.equal(first.value.alreadyPlaced, false);
+  assert.equal(notifications.length, 1, "a new order notifies once");
+
+  // Same key again: resolves to the original order, so it must not notify again.
+  const retry = await service.placeOrder(CUSTOMER_A, {
+    idempotencyKey,
+    reviewedSubtotalCents: 1500,
+    customerPhone: "+15551234567",
+  });
+  assert.equal(retry.ok, true);
+  assert.equal(retry.value.alreadyPlaced, true);
+  assert.equal(retry.value.orderId, first.value.orderId);
+  assert.equal(notifications.length, 1, "a retry must not notify Telegram twice");
+  assert.equal(db.orders.size, 1, "a retry must not create a second order");
+});
+
 /* --------------------------------------------------------------------------
    Telegram Integration Tests
    -------------------------------------------------------------------------- */

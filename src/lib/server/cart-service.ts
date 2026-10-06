@@ -565,7 +565,12 @@ export function createCartService(
       // Post-commit Telegram notification.
       // Database transaction has succeeded and committed; any Telegram failure
       // or missing credentials must never roll back or disrupt the customer's order.
-      if (!placed.alreadyPlaced && (validatedPhone || validatedName)) {
+      //
+      // Only a freshly created order reaches this point: a retried submission
+      // with the same idempotency key resolves to its original order (and
+      // `alreadyPlaced: true`) above, before the transaction, so an order can
+      // never be notified twice.
+      if (validatedPhone || validatedName) {
         try {
           const customerRow = await client.customer
             .findUnique({
