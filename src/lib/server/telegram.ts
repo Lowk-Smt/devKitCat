@@ -29,11 +29,17 @@ export interface TelegramOrderNotification {
   readonly status: string;
 }
 
-export interface TelegramNotificationResult {
-  readonly ok: boolean;
-  readonly skipped?: boolean;
-  readonly error?: string;
-}
+export type TelegramNotificationError =
+  | "FORMAT_ERROR"
+  | "TIMEOUT"
+  | "NETWORK_ERROR"
+  | "INVALID_RESPONSE"
+  | "TELEGRAM_API_ERROR"
+  | `HTTP_${number}`;
+
+export type TelegramNotificationResult =
+  | { readonly ok: true; readonly skipped?: true }
+  | { readonly ok: false; readonly error: TelegramNotificationError };
 
 /** Escapes special HTML characters to prevent message injection in Telegram HTML parse_mode. */
 export function escapeTelegramHtml(text: string): string {
@@ -75,10 +81,41 @@ export function formatTelegramOrderMessage(
   return lines.join("\n");
 }
 
+/** Treat API descriptions as untrusted text; never log a response or exception wholesale. */
+function safeTelegramDescription(
+  body: unknown,
+  secrets: readonly (string | null | undefined)[],
+): string {
+  if (
+    typeof body !== "object" ||
+    body === null ||
+    !("description" in body) ||
+    typeof body.description !== "string"
+  ) {
+    return "No valid Telegram description";
+  }
+
+  let description = body.description;
+  // Redact before truncation so a credential crossing the length limit cannot leak.
+  for (const secret of secrets) {
+    if (secret) description = description.split(secret).join("[redacted]");
+  }
+  description = description
+    .replace(/\b[a-z][a-z0-9+.-]*:\/\/\S+/gi, "[redacted-url]")
+    .replace(/\b\d+:[A-Za-z0-9_-]{20,}\b/g, "[redacted-token]")
+    .replace(/\b(password|secret|token|api[_-]?key)\s*[=:]\s*("[^"]*"|'[^']*'|[^\s,;]+)/gi, "$1=[redacted]");
+  // Strip control characters as well as collapsing newlines into one log line.
+  description = Array.from(description, (character) => {
+    const code = character.charCodeAt(0);
+    return code < 32 || (code >= 127 && code <= 159) ? " " : character;
+  }).join("");
+  return description.replace(/\s+/g, " ").trim().slice(0, 200) || "No valid Telegram description";
+}
+
 /**
  * Dispatches a Telegram message to the configured staff chat.
- * Fails safely and non-destructively: catches network and HTTP errors,
- * never throws, and never exposes or logs the bot token.
+ * Awaits and validates Telegram's JSON acknowledgment, not just HTTP headers.
+ * Formatting, network, timeout and API failures never fail the committed order.
  */
 export async function sendTelegramOrderNotification(
   notification: TelegramOrderNotification,
@@ -98,9 +135,22 @@ export async function sendTelegramOrderNotification(
     return { ok: true, skipped: true };
   }
 
-  const message = formatTelegramOrderMessage(notification);
+  let httpStatus: number | undefined;
+  let signal: AbortSignal | undefined;
+  let exceptionCode: TelegramNotificationError = "FORMAT_ERROR";
+  function fail(error: TelegramNotificationError, description?: string): TelegramNotificationResult {
+    const status = httpStatus === undefined ? "" : `, HTTP ${httpStatus}`;
+    const detail = description ? `: ${description}` : "";
+    console.warn(
+      `[devKitCat telegram] notification failed for order ${notification.orderId} (${error}${status})${detail}.`,
+    );
+    return { ok: false, error };
+  }
 
   try {
+    const message = formatTelegramOrderMessage(notification);
+    exceptionCode = "NETWORK_ERROR";
+    signal = AbortSignal.timeout(5000);
     const response = await fetch(
       `https://api.telegram.org/bot${token}/sendMessage`,
       {
@@ -111,38 +161,46 @@ export async function sendTelegramOrderNotification(
           text: message,
           parse_mode: "HTML",
         }),
-        signal: AbortSignal.timeout(5000),
+        signal,
       },
     );
+    httpStatus = response.status;
 
-    if (!response.ok) {
-      let description = "unknown error";
-      try {
-        const body: unknown = await response.json();
-        if (
-          typeof body === "object" &&
-          body !== null &&
-          "description" in body &&
-          typeof body.description === "string"
-        ) {
-          // Telegram's description is safe diagnostic text; credentials are
-          // never included in this log.
-          description = body.description.slice(0, 200);
-        }
-      } catch {
-        // Preserve the HTTP status when Telegram does not return JSON.
-      }
-      console.warn(
-        `[devKitCat telegram] Failed to send notification for order ${notification.orderId} (HTTP ${response.status}): ${description}.`,
-      );
-      return { ok: false, error: `HTTP_${response.status}` };
+    let body: unknown;
+    try {
+      // The same deadline also covers response-body consumption.
+      body = await response.json();
+    } catch (error) {
+      // Invalid JSON is an invalid acknowledgment; transport/abort errors still
+      // need the network/timeout classification from the outer catch.
+      if (!(error instanceof SyntaxError)) throw error;
     }
 
-    return { ok: true };
-  } catch {
-    console.warn(
-      `[devKitCat telegram] Network error sending notification for order ${notification.orderId}.`,
+    const description = safeTelegramDescription(body, [
+      token, chatId, env.DATABASE_URL, notification.customerName,
+      notification.customerEmail, notification.customerPhone, notification.telegramHandle,
+    ]);
+    if (!response.ok) {
+      return fail(`HTTP_${response.status}`, description);
+    }
+    if (
+      typeof body !== "object" ||
+      body === null ||
+      !("ok" in body) ||
+      typeof body.ok !== "boolean"
+    ) {
+      return fail("INVALID_RESPONSE");
+    }
+    if (!body.ok) {
+      return fail("TELEGRAM_API_ERROR", description);
+    }
+
+    console.info(
+      `[devKitCat telegram] notification acknowledged for order ${notification.orderId} (HTTP ${httpStatus}, telegramOk: true).`,
     );
-    return { ok: false, error: "NETWORK_ERROR" };
+    return { ok: true };
+  } catch (error) {
+    const timedOut = signal?.aborted || (error instanceof Error && error.name === "TimeoutError");
+    return fail(timedOut ? "TIMEOUT" : exceptionCode);
   }
 }

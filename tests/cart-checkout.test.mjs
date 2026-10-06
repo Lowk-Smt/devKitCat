@@ -307,7 +307,7 @@ function makeService(database = makeCartDatabase(), logger = () => {}) {
   return {
     database,
     logged: logger,
-    cart: createCartService(() => database.client, logger),
+    cart: createCartService(() => database.client, logger, async () => ({ ok: true })),
   };
 }
 
