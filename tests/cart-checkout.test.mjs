@@ -986,6 +986,28 @@ test('a "use server" module only exports async functions', async () => {
   }
 });
 
+test("activating Review & checkout closes the cart while navigating to /checkout", async () => {
+  const drawer = await readSource("src/components/cart/CartDrawer.tsx");
+  const checkoutButton = drawer.match(
+    /<Button\s+([^>]*?)>\s*Review &amp; checkout\s*<\/Button>/s,
+  );
+
+  assert.ok(checkoutButton, "the checkout action should remain a Button link");
+  assert.match(checkoutButton[1], /href="\/checkout"/);
+  assert.match(
+    checkoutButton[1],
+    /onClick=\{close\}/,
+    "activation should close the cart at the navigation trigger",
+  );
+
+  const button = await readSource("src/components/ui/Button.tsx");
+  assert.match(
+    button,
+    /<AppLink[\s\S]*?href=\{href\}[\s\S]*?onClick=\{onClick\}/,
+    "Button links must forward activation to the close callback",
+  );
+});
+
 test("the checkout route is protected and reads only the session customer's cart", async () => {
   const page = await readSource("src/app/checkout/page.tsx");
 
