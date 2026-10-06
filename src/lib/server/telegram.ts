@@ -87,9 +87,13 @@ export async function sendTelegramOrderNotification(
   const token = env.TELEGRAM_BOT_TOKEN?.trim();
   const chatId = env.TELEGRAM_CHAT_ID?.trim();
 
+  console.info(
+    `[devKitCat telegram] notification invoked for order ${notification.orderId} (telegramConfigured: ${Boolean(token && chatId)}).`,
+  );
+
   if (!token || !chatId) {
     console.warn(
-      `[devKitCat telegram] TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID is not configured. Order notification skipped for ${notification.orderId}.`,
+      `[devKitCat telegram] Telegram is not configured; notification skipped for order ${notification.orderId}.`,
     );
     return { ok: true, skipped: true };
   }
@@ -112,8 +116,24 @@ export async function sendTelegramOrderNotification(
     );
 
     if (!response.ok) {
+      let description = "unknown error";
+      try {
+        const body: unknown = await response.json();
+        if (
+          typeof body === "object" &&
+          body !== null &&
+          "description" in body &&
+          typeof body.description === "string"
+        ) {
+          // Telegram's description is safe diagnostic text; credentials are
+          // never included in this log.
+          description = body.description.slice(0, 200);
+        }
+      } catch {
+        // Preserve the HTTP status when Telegram does not return JSON.
+      }
       console.warn(
-        `[devKitCat telegram] Failed to send Telegram notification for order ${notification.orderId} (HTTP ${response.status}).`,
+        `[devKitCat telegram] Failed to send notification for order ${notification.orderId} (HTTP ${response.status}): ${description}.`,
       );
       return { ok: false, error: `HTTP_${response.status}` };
     }
