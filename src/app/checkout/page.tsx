@@ -152,6 +152,7 @@ export default async function CheckoutPage() {
             <CheckoutSubmit
               idempotencyKey={generateOrderIdempotencyKey()}
               reviewedSubtotalCents={summary.subtotalCents}
+              initialCustomerName={customer.name}
               disabled={!summary.canCheckout}
             />
           </aside>

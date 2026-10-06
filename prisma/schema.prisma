@@ -245,11 +245,14 @@ model CartItem {
 }
 
 model Order {
-  id         String      @id @default(cuid())
-  customerId String
-  status     OrderStatus
-  total      Decimal     @db.Decimal(10, 2)
-  currency   String      @default("USD") @db.VarChar(3)
+  id             String      @id @default(cuid())
+  customerId     String
+  status         OrderStatus
+  total          Decimal     @db.Decimal(10, 2)
+  currency       String      @default("USD") @db.VarChar(3)
+  customerName   String?     @db.VarChar(120)
+  customerPhone  String?     @db.VarChar(32)
+  telegramHandle String?     @db.VarChar(64)
   /// Client-supplied, server-validated checkout token. It lets a retried or
   /// double-submitted checkout resolve to the order it already created instead
   /// of creating a second one; uniqueness is enforced per customer below. Null

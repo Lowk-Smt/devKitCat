@@ -60,6 +60,10 @@ export type CartFailureCode =
   | "TOTAL_CHANGED"
   /** Missing or malformed idempotency key / reviewed subtotal. */
   | "INVALID_CHECKOUT"
+  /** Missing or malformed contact phone number. */
+  | "INVALID_PHONE"
+  /** Missing or malformed customer full name. */
+  | "INVALID_NAME"
   | "ERROR";
 
 export interface CartFailureContext {
@@ -136,6 +140,58 @@ export function isOrderReference(value: unknown): value is string {
   return typeof value === "string" && ORDER_REFERENCE_PATTERN.test(value);
 }
 
+/** Allowed characters in international phone input: digits, spaces, -, ., (), and optional leading + */
+const PHONE_CHARS_PATTERN = /^\+?[0-9\s\-().]{7,32}$/;
+
+/**
+ * Validates and normalizes a customer phone number.
+ * Accepts common international and domestic formats (7-16 digits, 7-32 characters).
+ * Rejects empty values, letters, control characters, and out-of-range lengths.
+ */
+export function normalizeOrderPhoneNumber(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (!PHONE_CHARS_PATTERN.test(trimmed)) return null;
+
+  const digitCount = (trimmed.match(/\d/g) || []).length;
+  if (digitCount < 7 || digitCount > 16) return null;
+
+  return trimmed;
+}
+
+/**
+ * Normalizes customer full name for order records.
+ * Strips control characters, collapses whitespace, and bounds length (2-120 chars).
+ */
+export function normalizeOrderCustomerName(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const cleaned = value
+    .replace(/[\u0000-\u001F\u007F\u200B-\u200D\uFEFF]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (cleaned.length < 2 || cleaned.length > 120) return null;
+  return cleaned;
+}
+
+const TELEGRAM_HANDLE_PATTERN = /^@?[a-zA-Z0-9_]{3,32}$/;
+
+/**
+ * Normalizes an optional Telegram username handle.
+ * If provided, ensures it starts with `@` and matches Telegram handle rules (3-32 alphanumeric/underscore).
+ * Returns null if empty/omitted.
+ */
+export function normalizeTelegramHandle(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (trimmed.length === 0) return null;
+
+  if (!TELEGRAM_HANDLE_PATTERN.test(trimmed)) return null;
+
+  const handle = trimmed.startsWith("@") ? trimmed : `@${trimmed}`;
+  return handle.slice(0, 64);
+}
+
 function joinTitles(titles: readonly string[]): string {
   if (titles.length === 0) return "One or more items";
   if (titles.length === 1) return `“${titles[0]}”`;
@@ -175,7 +231,12 @@ export function describeCartFailure(
       return "The order total changed since this page loaded. Review the updated subtotal and submit again.";
     case "INVALID_CHECKOUT":
       return "This checkout could not be completed. Review your cart and try again.";
+    case "INVALID_PHONE":
+      return "Please enter a valid contact phone number.";
+    case "INVALID_NAME":
+      return "Please enter your full name.";
     case "ERROR":
+    default:
       return "We could not update your cart. Please try again.";
   }
 }
@@ -201,6 +262,10 @@ export function describeCheckoutFailure(
       return "Prices changed since you opened checkout. Review the updated subtotal below and submit again. Nothing was charged.";
     case "INVALID_CHECKOUT":
       return "This checkout session has expired. Reload the page and try again. Nothing was charged.";
+    case "INVALID_PHONE":
+      return "Please enter a valid phone number so we can reach you to complete your order.";
+    case "INVALID_NAME":
+      return "Please enter your full name for this order.";
     case "UNAUTHENTICATED":
       return "Please sign in to place an order.";
     case "UNAVAILABLE":

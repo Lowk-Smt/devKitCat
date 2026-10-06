@@ -34,9 +34,25 @@ export function OrderSummary({ order }: { order: ResolvedOrder }) {
         <div className={styles.summaryRow}>
           <dt>Payment</dt>
           <dd>
-            <strong>Not processed</strong>
+            <strong>{unpaid ? "Awaiting payment" : "Completed"}</strong>
           </dd>
         </div>
+        {order.customerPhone ? (
+          <div className={styles.summaryRow}>
+            <dt>Phone</dt>
+            <dd>
+              <strong>{order.customerPhone}</strong>
+            </dd>
+          </div>
+        ) : null}
+        {order.telegramHandle ? (
+          <div className={styles.summaryRow}>
+            <dt>Telegram</dt>
+            <dd>
+              <strong>{order.telegramHandle}</strong>
+            </dd>
+          </div>
+        ) : null}
       </dl>
 
       <p className={styles.summaryTotal}>
@@ -45,7 +61,7 @@ export function OrderSummary({ order }: { order: ResolvedOrder }) {
       </p>
       <p className={styles.summaryNote}>
         {unpaid
-          ? "This order is awaiting payment: payment processing is not connected to devKitCat yet, so nothing has been charged, no payment record exists, and no download has been unlocked."
+          ? "This order is awaiting payment: payment will be confirmed and assets delivered manually via Telegram."
           : "Payment processing is not connected to devKitCat yet, so this order carries no payment record."}
       </p>
       <Button href="/account/downloads" variant="secondary" fullWidth>

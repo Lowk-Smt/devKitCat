@@ -141,12 +141,27 @@ export async function placeOrderAction(
 ): Promise<CheckoutFormState> {
   const customer = await requireCustomer();
 
+  const customerName = formData.get("customerName");
+  const customerPhone = formData.get("customerPhone");
+  const telegramHandle = formData.get("telegramHandle");
+
+  // Phone number is required for manual fulfillment
+  if (typeof customerPhone !== "string" || !customerPhone.trim()) {
+    return {
+      status: "error",
+      message: describeCheckoutFailure("INVALID_PHONE"),
+    };
+  }
+
   const result = await cart.placeOrder(customer.id, {
     // Both values are validated server-side: the key only resolves a retry to
     // its own order, and the reviewed subtotal is compared against a freshly
     // computed total rather than being used as a price.
     idempotencyKey: formData.get("idempotencyKey"),
     reviewedSubtotalCents: formData.get("reviewedSubtotalCents"),
+    customerName,
+    customerPhone,
+    telegramHandle,
   });
 
   if (!result.ok) {

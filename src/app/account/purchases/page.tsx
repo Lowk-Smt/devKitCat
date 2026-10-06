@@ -107,6 +107,17 @@ export default async function PurchasesPage({
               </Button>
             }
           />
+        ) : orders.length === 0 && !query ? (
+          <EmptyState
+            icon="receipt"
+            title="No purchases yet"
+            description="When you purchase a devKitCat resource, its order details will appear here."
+            action={
+              <Button href="/products" variant="secondary">
+                Browse products
+              </Button>
+            }
+          />
         ) : matchingOrders.length > 0 ? (
           <div className={styles.purchaseStack}>
             {matchingOrders.map((order) => (

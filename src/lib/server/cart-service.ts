@@ -20,10 +20,17 @@ import {
   isCatalogIdentifier,
   isCustomerIdentifier,
   isOrderIdempotencyKey,
+  normalizeOrderCustomerName,
+  normalizeOrderPhoneNumber,
+  normalizeTelegramHandle,
   parseCartQuantity,
   type CartFailureCode,
 } from "./cart-core";
 import { mapCategoryIcon } from "./data-access-core";
+import {
+  sendTelegramOrderNotification,
+  type TelegramOrderNotification,
+} from "./telegram";
 
 /**
  * Database-backed shopping cart and checkout submission.
@@ -76,6 +83,12 @@ export interface CheckoutInput {
    * two disagree, so a price or availability change forces a fresh review.
    */
   reviewedSubtotalCents: unknown;
+  /** Customer's full name for order records. */
+  customerName?: unknown;
+  /** Customer's contact phone number for manual payment and fulfillment. */
+  customerPhone?: unknown;
+  /** Optional customer Telegram handle (e.g. @username). */
+  telegramHandle?: unknown;
 }
 
 export interface CartService {
@@ -104,6 +117,10 @@ export interface CartService {
 }
 
 export type CartLogger = (resource: string, code: string) => void;
+
+export type TelegramNotifier = (
+  notification: TelegramOrderNotification,
+) => Promise<unknown>;
 
 /** Prisma's unique-constraint and missing-row codes drive the user-facing errors. */
 const UNIQUE_VIOLATION_CODE = "P2002";
@@ -202,6 +219,7 @@ export function createCartService(
   logger: CartLogger = (resource, code) => {
     console.error(`[devKitCat cart] ${resource} failed (${code}).`);
   },
+  notifier: TelegramNotifier = sendTelegramOrderNotification,
 ): CartService {
   function resolveClient(): PrismaClient | null {
     try {
@@ -402,6 +420,27 @@ export function createCartService(
     const reviewedSubtotalCents = parseReviewedSubtotal(input.reviewedSubtotalCents);
     if (reviewedSubtotalCents === null) return failure("INVALID_CHECKOUT");
 
+    // Contact fields are validated server-side if provided.
+    const customerPhone = input.customerPhone;
+    let validatedPhone: string | null = null;
+    if (customerPhone !== undefined) {
+      validatedPhone = normalizeOrderPhoneNumber(customerPhone);
+      if (!validatedPhone) return failure("INVALID_PHONE");
+    }
+
+    const customerName = input.customerName;
+    let validatedName: string | null = null;
+    if (customerName !== undefined) {
+      validatedName = normalizeOrderCustomerName(customerName);
+      if (!validatedName) return failure("INVALID_NAME");
+    }
+
+    const telegramHandle = input.telegramHandle;
+    const validatedTelegram =
+      telegramHandle !== undefined
+        ? normalizeTelegramHandle(telegramHandle)
+        : null;
+
     const { client } = gate;
     const idempotencyKey = input.idempotencyKey;
 
@@ -464,7 +503,7 @@ export function createCartService(
         if (totals.some((total) => total === null)) throw new CartFailure("ERROR");
 
         const totalCents = sumCents(totals as number[]);
-        if (totalCents === null || totalCents === 0) throw new CartFailure("CART_EMPTY");
+        if (totalCents === null || totalCents < 0) throw new CartFailure("ERROR");
 
         // The customer must have reviewed this exact total; otherwise the
         // catalog moved under them and the order is refused.
@@ -487,6 +526,9 @@ export function createCartService(
             total: priceCentsToDecimalString(totalCents),
             currency: CART_CURRENCY,
             idempotencyKey,
+            customerName: validatedName,
+            customerPhone: validatedPhone,
+            telegramHandle: validatedTelegram,
             items: {
               create: priced.map(({ row, quantity, unitPriceCents: unit }, position) => ({
                 productId: row.productId,
@@ -509,12 +551,54 @@ export function createCartService(
           orderId: order.id,
           totalCents,
           itemCount: priced.reduce((sum, { quantity }) => sum + quantity, 0),
+          customerName: validatedName,
+          customerPhone: validatedPhone,
+          telegramHandle: validatedTelegram,
+          notificationItems: priced.map(({ row, quantity, unitPriceCents: unit }) => ({
+            quantity,
+            productTitle: row.product.title,
+            unitPrice: priceCentsToDecimalString(unit),
+          })),
         };
       });
 
+      // Post-commit Telegram notification.
+      // Database transaction has succeeded and committed; any Telegram failure
+      // or missing credentials must never roll back or disrupt the customer's order.
+      if (!placed.alreadyPlaced && (validatedPhone || validatedName)) {
+        try {
+          const customerRow = await client.customer
+            .findUnique({
+              where: { id: customerId },
+              select: { email: true, name: true },
+            })
+            .catch(() => null);
+
+          await notifier({
+            orderId: placed.orderId,
+            customerName: placed.customerName || customerRow?.name || "Customer",
+            customerEmail: customerRow?.email || "N/A",
+            customerPhone: validatedPhone || "N/A",
+            telegramHandle: placed.telegramHandle,
+            items: placed.notificationItems,
+            total: priceCentsToDecimalString(placed.totalCents),
+            currency: CART_CURRENCY,
+            status: "PENDING PAYMENT",
+          }).catch(() => undefined);
+        } catch {
+          // Failure in notification is strictly non-blocking
+        }
+      }
+
       return {
         ok: true,
-        value: { ...placed, currency: CART_CURRENCY, alreadyPlaced: false },
+        value: {
+          orderId: placed.orderId,
+          totalCents: placed.totalCents,
+          currency: CART_CURRENCY,
+          itemCount: placed.itemCount,
+          alreadyPlaced: false,
+        },
       };
     } catch (error) {
       if (error instanceof CartFailure) return failure(error.code, error.titles);

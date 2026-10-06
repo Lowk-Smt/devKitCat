@@ -10,6 +10,7 @@ import {
   useTransition,
   type ReactNode,
 } from "react";
+import { usePathname } from "next/navigation";
 import { CartDrawer } from "@/components/cart/CartDrawer";
 import {
   CartContext,
@@ -78,6 +79,7 @@ function localLine(productId: string): CartLineView | null {
 }
 
 export function CartProvider({ children }: { children: ReactNode }) {
+  const pathname = usePathname();
   const localIds = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
   const [isOpen, setIsOpen] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
@@ -88,26 +90,29 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const syncRef = useRef<Promise<boolean> | null>(null);
 
   /**
-   * Reads the database cart once per page load and remembers whether there is a
-   * session to read. Mutations await the same promise, so a click that lands
-   * before the read finishes still goes to the right cart.
+   * Reads the database cart on load and remembers session auth state.
+   * Passing `force = true` busts any cached sync promise so signing in or out
+   * immediately re-synchronizes cart state.
    */
-  const syncCart = useCallback((): Promise<boolean> => {
-    if (!syncRef.current) {
+  const syncCart = useCallback((force = false): Promise<boolean> => {
+    if (force || !syncRef.current) {
       syncRef.current = readCartAction()
         .then((result) => {
           if (result.status === "ok") {
             setServerCart(result.cart);
+            setIsAuthenticated(true);
             return true;
           }
 
           if (result.status === "error") setNotice(result.message);
+          setIsAuthenticated(false);
+          setServerCart(null);
           return false;
         })
-        .catch(() => false)
-        .then((authenticated) => {
-          setIsAuthenticated(authenticated);
-          return authenticated;
+        .catch(() => {
+          setIsAuthenticated(false);
+          setServerCart(null);
+          return false;
         });
     }
 
@@ -115,8 +120,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    void syncCart();
-  }, [syncCart]);
+    void syncCart(true);
+  }, [pathname, syncCart]);
 
   const localCart = useMemo(
     () =>

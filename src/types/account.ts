@@ -55,6 +55,9 @@ export interface ResolvedOrder {
   status: OrderStatus;
   total: number;
   currency: string;
+  customerName?: string | null;
+  customerPhone?: string | null;
+  telegramHandle?: string | null;
   items: ResolvedOrderItem[];
 }
 
