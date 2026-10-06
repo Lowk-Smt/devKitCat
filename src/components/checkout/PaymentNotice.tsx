@@ -11,11 +11,12 @@ interface PaymentNoticeProps {
 }
 
 /**
- * States plainly that devKitCat has no payment provider connected.
+ * States plainly that devKitCat uses manual Telegram fulfillment and no automated
+ * payment provider is connected yet.
  *
  * It appears on the checkout screen and on the confirmation for an order that
- * checkout created, so no screen can imply that a payment happened, that card
- * details were collected, or that a download has been unlocked.
+ * checkout created, so no screen can imply that card details were collected
+ * or that an automated charge took place.
  */
 export function PaymentNotice({ variant }: PaymentNoticeProps) {
   const isCheckout = variant === "checkout";
@@ -28,13 +29,13 @@ export function PaymentNotice({ variant }: PaymentNoticeProps) {
       <div className={styles.copy}>
         <p className={styles.title}>
           {isCheckout
-            ? "Payment is not enabled yet"
-            : "Order received — payment is not enabled yet"}
+            ? "Payment is not enabled yet — manual Telegram fulfillment"
+            : "Order received — awaiting manual payment"}
         </p>
         <p className={styles.body}>
           {isCheckout
-            ? "Submitting records this order on your devKitCat account and nothing else. No payment provider is connected, so you will not be charged and no card details are collected. The subtotal is the current catalog total; tax, shipping, discounts, and final payment calculations arrive with the payment integration."
-            : "Your order is saved with the status “Awaiting payment”. No payment provider is connected to devKitCat yet, so nothing has been charged, no card details were collected, and no download has been unlocked. Payment processing arrives in a later release."}
+            ? "Submitting records this order on your devKitCat account. No payment provider is connected yet, so you will not be charged now and no card details are collected. No download is unlocked until our team manually verifies payment with you on Telegram."
+            : "Your order has been created successfully with status “Awaiting payment”. No payment provider is connected yet, so nothing was charged and no download has been unlocked automatically. Our team will verify payment and deliver your purchased assets through Telegram."}
         </p>
       </div>
     </div>

@@ -1,7 +1,57 @@
 .form {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 0.85rem;
+}
+
+.fieldGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.label {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  font-weight: 550;
+}
+
+.required {
+  color: var(--accent);
+}
+
+.optional {
+  color: var(--text-faint);
+  font-weight: 400;
+  font-size: 0.75rem;
+}
+
+.input {
+  display: block;
+  width: 100%;
+  min-height: 2.85rem;
+  padding: 0.65rem 0.8rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: rgba(8, 10, 15, 0.62);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.88rem;
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.input::placeholder {
+  color: var(--text-faint);
+}
+
+.fieldHint {
+  color: var(--text-faint);
+  font-size: 0.73rem;
+  line-height: 1.4;
 }
 
 .error {

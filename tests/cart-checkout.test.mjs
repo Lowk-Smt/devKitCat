@@ -966,10 +966,10 @@ test("cart Server Functions authorize before touching the cart", async () => {
   // Five mutating actions, each gated on the session customer.
   assert.equal(source.match(/await requireCustomer\(\)/g).length, 5);
   assert.match(source, /const customer = await getAuthenticatedCustomer\(\);/);
-  // The only client-supplied checkout fields are the documented pair.
+  // The form fields: verification tokens alongside customer contact details.
   assert.deepEqual(
     [...source.matchAll(/formData\.get\("([^"]+)"\)/g)].map((match) => match[1]).sort(),
-    ["idempotencyKey", "reviewedSubtotalCents"],
+    ["customerName", "customerPhone", "idempotencyKey", "reviewedSubtotalCents", "telegramHandle"],
   );
   // No action returns raw failure codes or stack traces to the client.
   assert.doesNotMatch(source, /message: (result|error)\.message/);
@@ -1027,11 +1027,11 @@ test("client cart components never send prices, totals, or ownership", async () 
     }
   }
 
-  // The submission form carries exactly the two server-generated fields.
+  // The submission form carries the verification tokens and contact fields.
   const submit = await readSource("src/components/checkout/CheckoutSubmit.tsx");
   assert.deepEqual(
     [...submit.matchAll(/name="([^"]+)"/g)].map((match) => match[1]).sort(),
-    ["idempotencyKey", "reviewedSubtotalCents"],
+    ["customerName", "customerPhone", "idempotencyKey", "reviewedSubtotalCents", "telegramHandle"],
   );
 
   // No Prisma or server-only import leaks into a client bundle.

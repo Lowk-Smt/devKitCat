@@ -202,6 +202,100 @@
   margin-bottom: 1rem;
 }
 
+.telegramActionCard {
+  margin-bottom: 1.5rem;
+  padding: 1.25rem 1.4rem;
+  border: 1px solid rgba(93, 125, 249, 0.35);
+  border-radius: var(--radius-lg);
+  background:
+    radial-gradient(ellipse at 100% 0%, rgba(93, 125, 249, 0.12), transparent 20rem),
+    linear-gradient(145deg, rgba(19, 23, 33, 0.95), rgba(14, 17, 24, 0.95));
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.22);
+}
+
+.telegramActionHeader {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.85rem;
+  margin-bottom: 1rem;
+}
+
+.telegramActionIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: var(--radius-sm);
+  background: rgba(93, 125, 249, 0.15);
+  color: var(--accent-strong);
+  flex-shrink: 0;
+}
+
+.telegramActionTitle {
+  color: var(--text);
+  font-size: 1.05rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.telegramActionSubtitle {
+  margin-top: 0.25rem;
+  color: var(--text-muted);
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
+.nextStepsList {
+  display: grid;
+  gap: 0.55rem;
+  margin: 0 0 1rem 1.2rem;
+  padding: 0;
+  color: var(--text-muted);
+  font-size: 0.84rem;
+  line-height: 1.5;
+}
+
+.nextStepsList strong {
+  color: var(--text);
+}
+
+.nextStepsList code {
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.4);
+  color: var(--accent-strong);
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+}
+
+.contactRecord {
+  margin-bottom: 1rem;
+  padding: 0.55rem 0.75rem;
+  border-radius: var(--radius-sm);
+  background: rgba(8, 10, 15, 0.5);
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.telegramActionButtons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.telegramManualNote {
+  color: var(--text-faint);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.telegramManualNote code {
+  color: var(--accent-strong);
+  font-family: var(--font-mono);
+}
+
 .detailGrid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(15rem, 18.5rem);

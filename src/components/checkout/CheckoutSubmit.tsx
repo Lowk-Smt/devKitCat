@@ -14,24 +14,24 @@ interface CheckoutSubmitProps {
   idempotencyKey: string;
   /** The subtotal on screen when the form was rendered. */
   reviewedSubtotalCents: number;
+  /** Pre-filled customer name from authenticated session */
+  initialCustomerName?: string;
   disabled?: boolean;
 }
 
 /**
  * The order submission form.
  *
- * It posts two server-generated values and nothing else: no price, no total, no
- * product list, and no customer identity. `placeOrderAction` re-authenticates,
- * re-reads the cart, recomputes the total from current catalog prices, and
- * refuses the order when the reviewed subtotal no longer matches — so a stale or
- * tampered form cannot change what is charged later or who owns the order.
- *
- * A double submission cannot create two orders: the key is unique per customer
- * in the database, and the retry resolves to the order it already made.
+ * Posts the server-generated checkout tokens alongside contact details:
+ * full name, phone number, and optional Telegram username.
+ * `placeOrderAction` re-authenticates, re-reads the cart, recomputes the total
+ * from current catalog prices, validates contact details, and refuses the order
+ * if tampered or stale.
  */
 export function CheckoutSubmit({
   idempotencyKey,
   reviewedSubtotalCents,
+  initialCustomerName = "",
   disabled = false,
 }: CheckoutSubmitProps) {
   const [state, formAction, pending] = useActionState<CheckoutFormState, FormData>(
@@ -48,6 +48,57 @@ export function CheckoutSubmit({
         value={reviewedSubtotalCents}
       />
 
+      <div className={styles.fieldGroup}>
+        <label htmlFor="checkout-name" className={styles.label}>
+          Full name <span className={styles.required}>*</span>
+        </label>
+        <input
+          id="checkout-name"
+          type="text"
+          name="customerName"
+          defaultValue={initialCustomerName}
+          required
+          autoComplete="name"
+          maxLength={120}
+          className={styles.input}
+          placeholder="Your full name"
+        />
+      </div>
+
+      <div className={styles.fieldGroup}>
+        <label htmlFor="checkout-phone" className={styles.label}>
+          Phone number <span className={styles.required}>*</span>
+        </label>
+        <input
+          id="checkout-phone"
+          type="tel"
+          name="customerPhone"
+          required
+          autoComplete="tel"
+          maxLength={32}
+          className={styles.input}
+          placeholder="+1 (555) 000-0000"
+        />
+        <span className={styles.fieldHint}>
+          Required to confirm payment and coordinate fulfillment.
+        </span>
+      </div>
+
+      <div className={styles.fieldGroup}>
+        <label htmlFor="checkout-telegram" className={styles.label}>
+          Telegram username <span className={styles.optional}>(optional)</span>
+        </label>
+        <input
+          id="checkout-telegram"
+          type="text"
+          name="telegramHandle"
+          autoComplete="off"
+          maxLength={64}
+          className={styles.input}
+          placeholder="@username"
+        />
+      </div>
+
       {state.status === "error" && state.message ? (
         <p className={styles.error} role="alert">
           {state.message}
@@ -59,8 +110,8 @@ export function CheckoutSubmit({
       </Button>
 
       <p className={styles.hint}>
-        Nothing is charged: this records an unpaid order you can review in your
-        purchases. Payment arrives in a later release.
+        You will not be charged yet. We will confirm payment and deliver your
+        files directly via Telegram.
       </p>
     </form>
   );

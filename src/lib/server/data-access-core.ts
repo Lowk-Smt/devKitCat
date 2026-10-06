@@ -191,6 +191,9 @@ function mapOrder(record: OrderRecord): ResolvedOrder {
     status,
     total: Number(record.total),
     currency: record.currency,
+    customerName: record.customerName ?? null,
+    customerPhone: record.customerPhone ?? null,
+    telegramHandle: record.telegramHandle ?? null,
     items: record.items.map((item) => {
       const currentProduct = mapProduct(item.product);
       return {

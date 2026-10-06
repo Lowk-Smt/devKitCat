@@ -12,6 +12,8 @@ interface ButtonProps {
   size?: ButtonSize;
   /** When set, renders as a link. */
   href?: string;
+  target?: string;
+  rel?: string;
   type?: "button" | "submit";
   className?: string;
   ariaLabel?: string;
@@ -29,6 +31,8 @@ export function Button({
   variant = "primary",
   size = "md",
   href,
+  target,
+  rel,
   type = "button",
   className,
   ariaLabel,
@@ -48,6 +52,8 @@ export function Button({
     return (
       <AppLink
         href={href}
+        target={target}
+        rel={rel}
         className={classes}
         aria-label={ariaLabel}
         onClick={onClick}
