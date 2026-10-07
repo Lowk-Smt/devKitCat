@@ -29,6 +29,7 @@ import {
 import { mapCategoryIcon } from "./data-access-core";
 import {
   sendTelegramOrderNotification,
+  type TelegramNotificationResult,
   type TelegramOrderNotification,
 } from "./telegram";
 
@@ -120,7 +121,7 @@ export type CartLogger = (resource: string, code: string) => void;
 
 export type TelegramNotifier = (
   notification: TelegramOrderNotification,
-) => Promise<unknown>;
+) => Promise<TelegramNotificationResult>;
 
 /** Prisma's unique-constraint and missing-row codes drive the user-facing errors. */
 const UNIQUE_VIOLATION_CODE = "P2002";
@@ -593,11 +594,14 @@ export function createCartService(
           status: "PENDING PAYMENT",
         } satisfies TelegramOrderNotification;
 
-        await notifier(notification);
+        const notificationResult = await notifier(notification);
+        if (!notificationResult.ok) {
+          // A delivery failure is diagnostic only: the order is already committed.
+          logger(`telegram notification for order ${placed.orderId}`, notificationResult.error);
+        }
       } catch (error) {
-        // Failure in notification is strictly non-blocking, but retain a safe
-        // production diagnostic rather than silently discarding the failure.
-        logger("telegram notification", getSafeErrorCode(error));
+        // Retain a correlated fallback if an injected notifier unexpectedly throws.
+        logger(`telegram notification for order ${placed.orderId}`, getSafeErrorCode(error));
       }
 
       return {
