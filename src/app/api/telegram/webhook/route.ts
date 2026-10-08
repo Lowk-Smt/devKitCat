@@ -4,7 +4,10 @@ import {
   forwardTelegramMessage,
   sendTelegramChatMessage,
 } from "@/lib/server/telegram";
-import { createTelegramWebhookProcessor } from "@/lib/server/telegram-webhook-core";
+import {
+  createTelegramWebhookProcessor,
+  type TelegramUpdateOutcome,
+} from "@/lib/server/telegram-webhook-core";
 
 /**
  * Telegram webhook for the customer order connection.
@@ -15,10 +18,19 @@ import { createTelegramWebhookProcessor } from "@/lib/server/telegram-webhook-co
  * without the exact secret is rejected with 401 before the body is read or a
  * single database query runs, so only Telegram can drive this endpoint.
  *
- * The handler always answers 200 once authorized (or 401), never 5xx: a non-2xx
- * answer would make Telegram retry the delivery, and duplicate processing is
- * prevented by the update-id marker instead. Failures inside processing are
- * logged with safe error codes only — never raw bodies, tokens, or secrets.
+ * Retry semantics (no message is ever lost to a transient failure):
+ *
+ * * Processing state lives in `TelegramWebhookEvent` — a claimed lease keeps
+ *   concurrent duplicates out, `done` is permanent deduplication, and a failed
+ *   attempt releases its lease.
+ * * The route answers 200 when an update was processed, deliberately ignored,
+ *   or is a duplicate; it answers 500 (empty body, no detail) when processing
+ *   failed, so Telegram redelivers and the update is retried. Redeliveries
+ *   re-send nothing that already arrived: outbound staff messages are keyed by
+ *   the update id, and customer-facing sends leave retry-skip markers.
+ *
+ * Failures are logged with safe error codes only — never raw bodies, tokens,
+ * secrets, or raw Telegram API errors.
  */
 
 const processor = createTelegramWebhookProcessor({
@@ -55,12 +67,13 @@ export async function POST(request: Request): Promise<Response> {
   try {
     update = await request.json();
   } catch {
-    // Unparseable body from an authorized sender: acknowledge and drop it.
+    // Unparseable body from an authorized sender: retrying cannot help.
     return new Response(null, { status: 200 });
   }
 
+  let outcome: TelegramUpdateOutcome = "failed";
   try {
-    await processor.handleUpdate(update);
+    outcome = await processor.handleUpdate(update);
   } catch (error) {
     const code =
       typeof error === "object" && error !== null && "code" in error && typeof error.code === "string"
@@ -69,5 +82,6 @@ export async function POST(request: Request): Promise<Response> {
     console.error(`[devKitCat telegram-webhook] update processing failed (${code}).`);
   }
 
-  return new Response(null, { status: 200 });
+  // 200: processed, ignored, or duplicate. 500: left retryable for Telegram.
+  return new Response(null, { status: outcome === "failed" ? 500 : 200 });
 }

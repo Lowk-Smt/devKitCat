@@ -14,10 +14,12 @@
 --   * TelegramStaffRelay  — maps one relayed staff-chat message to the customer
 --                           chat that sent it, so the owner can answer with
 --                           Telegram's normal Reply action. Identifiers only,
---                           never message content.
---   * TelegramWebhookEvent — update ids already accepted by the webhook, so a
---                           Telegram retry cannot relay one customer message
---                           twice.
+--                           never message content. Source-update columns make
+--                           outbound sends retry-safe.
+--   * TelegramWebhookEvent — per-update processing state: a claim lease keeps
+--                           concurrent duplicates out, `done` is permanent
+--                           dedup, and a failed attempt stays retryable so a
+--                           transient failure can never lose a message.
 
 -- CreateTable
 CREATE TABLE "OrderTelegramLink" (
@@ -41,15 +43,26 @@ CREATE TABLE "TelegramStaffRelay" (
     "linkId" TEXT NOT NULL,
     "staffChatId" VARCHAR(32) NOT NULL,
     "staffMessageId" VARCHAR(32) NOT NULL,
+    "sourceUpdateId" VARCHAR(24),
+    "sourceKind" VARCHAR(16),
     "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "TelegramStaffRelay_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
+-- The webhook's retry-safe ledger: a claimed lease ("processing") keeps
+-- concurrent duplicates out, "done" is permanent dedup, and a failed attempt
+-- releases the lease so Telegram's redelivery is processed instead of lost.
 CREATE TABLE "TelegramWebhookEvent" (
     "updateId" VARCHAR(24) NOT NULL,
+    "status" VARCHAR(16) NOT NULL DEFAULT 'processing',
+    "leaseUntil" TIMESTAMPTZ(3),
+    "attempts" INTEGER NOT NULL DEFAULT 0,
+    "customerMessageId" VARCHAR(32),
+    "staffReplyMessageId" VARCHAR(32),
     "receivedAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMPTZ(3) NOT NULL,
 
     CONSTRAINT "TelegramWebhookEvent_pkey" PRIMARY KEY ("updateId")
 );
@@ -74,6 +87,11 @@ CREATE UNIQUE INDEX "TelegramStaffRelay_staffChatId_staffMessageId_key" ON "Tele
 
 -- CreateIndex
 CREATE INDEX "TelegramStaffRelay_linkId_idx" ON "TelegramStaffRelay"("linkId");
+
+-- CreateIndex
+-- Retry dedup: before (re)sending, the webhook checks whether this update
+-- already produced the relay/notice/forward.
+CREATE INDEX "TelegramStaffRelay_sourceUpdateId_idx" ON "TelegramStaffRelay"("sourceUpdateId");
 
 -- AddForeignKey
 -- Cascade, exactly like Session: deleting an order deletes its connection.

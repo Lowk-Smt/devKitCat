@@ -350,6 +350,11 @@ model OrderTelegramLink {
 /// the owner can answer with Telegram's normal Reply action and the webhook can
 /// route the reply to the right customer. Identifier rows only — never message
 /// content — so this is routing state, not a conversation history.
+///
+/// `sourceUpdateId`/`sourceKind` make outbound sends retry-safe: before the
+/// webhook (re)sends a relay, notice, or forward it checks whether this update
+/// already produced one, so a redelivered update after a transient failure can
+/// fill in missing state without sending the same message twice.
 model TelegramStaffRelay {
   id             String   @id @default(cuid())
   linkId         String
@@ -358,18 +363,43 @@ model TelegramStaffRelay {
   /// in the staff chat. Unique per staff chat, which is what makes a native
   /// Telegram Reply resolvable to exactly one customer connection.
   staffMessageId String   @db.VarChar(32)
+  /// The webhook update that produced this relay (dedup key for retries).
+  sourceUpdateId String?  @db.VarChar(24)
+  /// What kind of staff message this row maps: "relay", "connect-notice",
+  /// "forward", or "media-notice".
+  sourceKind     String?  @db.VarChar(16)
   createdAt      DateTime @default(now()) @db.Timestamptz(3)
 
   link OrderTelegramLink @relation(fields: [linkId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
   @@unique([staffChatId, staffMessageId])
   @@index([linkId])
+  @@index([sourceUpdateId])
 }
 
-/// Telegram update ids this webhook has already accepted. Telegram redelivers
-/// webhooks that were not acknowledged quickly, so recording the id before
-/// processing makes a retry a no-op instead of a duplicate relay.
+/// Webhook processing state per Telegram update id. Telegram redelivers
+/// updates it has not seen acknowledged, so this table is the retry-safe
+/// ledger:
+///
+/// * `status = "processing"` with a live `leaseUntil` means one delivery is
+///   working on it — concurrent duplicates skip. An expired lease can be
+///   stolen atomically by a retry.
+/// * `status = "done"` is permanent: a redelivered update is dropped.
+/// * A failed attempt releases the lease and the webhook answers 500, so
+///   Telegram retries and the update is not lost.
+///
+/// The message-id markers record which customer-facing message an update
+/// already delivered, so a retry re-sends nothing that arrived.
 model TelegramWebhookEvent {
-  updateId   String   @id @db.VarChar(24)
-  receivedAt DateTime @default(now()) @db.Timestamptz(3)
+  updateId   String    @id @db.VarChar(24)
+  status     String    @default("processing") @db.VarChar(16)
+  /// Claim lease; null once the update is done.
+  leaseUntil DateTime? @db.Timestamptz(3)
+  attempts   Int       @default(0)
+  /// Our bot's customer-facing message for this update, when one was delivered.
+  customerMessageId String? @db.VarChar(32)
+  /// Our bot's delivery of a staff reply for this update, when it happened.
+  staffReplyMessageId String? @db.VarChar(32)
+  receivedAt DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt  DateTime  @updatedAt @db.Timestamptz(3)
 }

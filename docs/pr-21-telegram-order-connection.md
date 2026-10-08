@@ -67,9 +67,16 @@ page HTML or logs.
   Connection status is derived (chat set ⇒ connected), not an enum.
 * **`TelegramStaffRelay`** — `(staffChatId, staffMessageId) @unique → linkId`.
   Makes a native Reply resolvable to exactly one customer connection, forever.
-* **`TelegramWebhookEvent`** — `updateId @id`. Telegram retries unacknowledged
-  deliveries; the id is recorded *before* processing so a retry is a no-op
-  instead of a duplicate relay.
+  `sourceUpdateId` + `sourceKind` additionally key each row to the webhook
+  update that produced it, which is what makes outbound staff messages
+  idempotent under retry.
+* **`TelegramWebhookEvent`** — the webhook's retry-safe ledger, one row per
+  update id: `status` (`processing`/`done`) with a bounded `leaseUntil` claim
+  keeps concurrent duplicates out, `done` is permanent deduplication, a failed
+  attempt releases the lease and the route answers 500 so Telegram redelivers,
+  and `customerMessageId`/`staffReplyMessageId` markers record which
+  customer-facing messages an update already delivered so a retry re-sends
+  nothing. `attempts` counts claims for diagnosis.
 * `Order.telegramHandle` is kept for historical rows but nothing writes it
   anymore; checkout's username field is gone.
 

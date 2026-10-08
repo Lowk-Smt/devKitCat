@@ -426,12 +426,15 @@ node scripts/set-telegram-webhook.mjs --url https://YOUR-SITE/api/telegram/webho
 ```
 
 The webhook route requires the exact secret header (`X-Telegram-Bot-Api-Secret-Token`),
-rejects everything else with 401 before reading the body, and answers 200 to
-Telegram even on internal errors — duplicate deliveries are absorbed by the
-`TelegramWebhookEvent` update-id marker instead. `TELEGRAM_CHAT_ID` must be the
-numeric chat id (negative for groups). When the bot is *not* configured, the
-order page falls back to the previous `NEXT_PUBLIC_TELEGRAM_CONTACT_URL` card,
-so nothing about today's behavior changes.
+rejects everything else with 401 before reading the body, and is **retry-safe**:
+each update is claimed in the `TelegramWebhookEvent` ledger (a bounded lease
+keeps concurrent duplicates out, `done` is permanent deduplication), processed
+sends are keyed by the update id so a redelivery never re-sends a message that
+already arrived, and a failed attempt answers **500** so Telegram redelivers
+instead of the message being lost. `TELEGRAM_CHAT_ID` must be the numeric chat
+id (negative for groups). When the bot is *not* configured, the order page
+falls back to the previous `NEXT_PUBLIC_TELEGRAM_CONTACT_URL` card, so nothing
+about today's behavior changes.
 
 ### Security model
 

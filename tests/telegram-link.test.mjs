@@ -45,8 +45,34 @@ function createMockDb() {
   const orders = new Map();
   const links = new Map();
   const relays = new Map();
-  const events = new Set();
+  // updateId -> ledger row (claim/lease/done state for webhook retries).
+  const events = new Map();
+  // Failure injection: the next event-table write throws it once, or the Nth
+  // (1-based) event write does — to simulate a blip at a precise step.
+  let nextEventWriteFailure = null;
+  let failEventWriteNumber = null;
+  let pendingNthFailure = null;
+  let failEventWriteBaseline = null;
+  let eventWriteCount = 0;
   let nextId = 1;
+  function eventWriteFailure() {
+    eventWriteCount += 1;
+    if (nextEventWriteFailure) {
+      const failure = nextEventWriteFailure;
+      nextEventWriteFailure = null;
+      return failure;
+    }
+    if (
+      failEventWriteNumber !== null &&
+      failEventWriteBaseline !== null &&
+      eventWriteCount - failEventWriteBaseline === failEventWriteNumber
+    ) {
+      failEventWriteNumber = null;
+      failEventWriteBaseline = null;
+      return pendingNthFailure;
+    }
+    return null;
+  }
 
   function addOrder(input) {
     const row = {
@@ -172,6 +198,14 @@ function createMockDb() {
           link: link ? { chatId: link.chatId, orderId: link.orderId } : null,
         };
       },
+      async findFirst({ where }) {
+        const relay =
+          [...relays.values()].find(
+            (r) => r.sourceUpdateId === where.sourceUpdateId && r.sourceKind === where.sourceKind,
+          ) ?? null;
+        if (!relay) return null;
+        return { staffChatId: relay.staffChatId, staffMessageId: relay.staffMessageId };
+      },
       async create({ data }) {
         if (
           [...relays.values()].some(
@@ -181,16 +215,56 @@ function createMockDb() {
         ) {
           throw { code: "P2002" };
         }
-        const row = { id: `relay_${nextId++}`, createdAt: new Date(), ...data };
+        const row = {
+          id: `relay_${nextId++}`,
+          sourceUpdateId: null,
+          sourceKind: null,
+          createdAt: new Date(),
+          ...data,
+        };
         relays.set(row.id, row);
         return row;
       },
     },
     telegramWebhookEvent: {
       async create({ data }) {
+        const failure = eventWriteFailure();
+        if (failure) throw failure;
         if (events.has(data.updateId)) throw { code: "P2002" };
-        events.add(data.updateId);
-        return { ...data };
+        const row = {
+          updateId: data.updateId,
+          status: data.status ?? "processing",
+          leaseUntil: data.leaseUntil ?? null,
+          attempts: data.attempts ?? 0,
+          customerMessageId: null,
+          staffReplyMessageId: null,
+          receivedAt: new Date(),
+        };
+        events.set(row.updateId, row);
+        return { ...row };
+      },
+      async findUnique({ where }) {
+        const row = events.get(where.updateId);
+        return row ? { ...row } : null;
+      },
+      async updateMany({ where, data }) {
+        const failure = eventWriteFailure();
+        if (failure) throw failure;
+        const row = events.get(where.updateId);
+        if (!row) return { count: 0 };
+        if (where.status !== undefined && row.status !== where.status) return { count: 0 };
+        if (where.leaseUntil?.lte !== undefined) {
+          const lease = where.leaseUntil.lte;
+          if (!(row.leaseUntil && row.leaseUntil <= lease)) return { count: 0 };
+        }
+        if (data.attempts?.increment !== undefined) row.attempts += data.attempts.increment;
+        if (data.status !== undefined) row.status = data.status;
+        if ("leaseUntil" in data) row.leaseUntil = data.leaseUntil ?? null;
+        if (data.customerMessageId !== undefined) row.customerMessageId = data.customerMessageId;
+        if (data.staffReplyMessageId !== undefined) {
+          row.staffReplyMessageId = data.staffReplyMessageId;
+        }
+        return { count: 1 };
       },
     },
     async $transaction(fn) {
@@ -198,7 +272,28 @@ function createMockDb() {
     },
   };
 
-  return { client, orders, links, relays, events, addOrder };
+  return {
+    client,
+    orders,
+    links,
+    relays,
+    events,
+    addOrder,
+    /** Makes the next event-table write fail once (simulating a database blip). */
+    failNextEventWrite(error = { code: "P1001" }) {
+      nextEventWriteFailure = error;
+    },
+    /**
+     * Makes the Nth (1-based) event-table write of this mock fail once. Event
+     * writes per update, in order: claim (create), any outbound marker, then
+     * the completion — e.g. N=3 fails "mark done" after all sends succeeded.
+     */
+    failEventWriteAt(n, error = { code: "P1001" }) {
+      failEventWriteNumber = n;
+      failEventWriteBaseline = eventWriteCount;
+      pendingNthFailure = error;
+    },
+  };
 }
 
 function createService(db, logger) {
@@ -231,8 +326,11 @@ function createMockTelegram() {
     failNextWith(error) {
       failNext = error;
     },
+    /** Delivered sends to one chat (failed attempts stay visible in `calls`). */
     sendsTo(chatId) {
-      return calls.filter((call) => call.op === "send" && call.chatId === chatId);
+      return calls.filter(
+        (call) => call.op === "send" && call.chatId === chatId && call.sentMessageId,
+      );
     },
     async sendChatMessage(chatId, text, options = {}) {
       return deliver({ op: "send", chatId, text, options });
@@ -517,9 +615,9 @@ test("a connected customer's text is relayed to the staff chat with reply mappin
   // The relayed message id is mapped so a native Reply can resolve it.
   const service = createService(db);
   const resolved = await service.resolveStaffRelay(STAFF_CHAT_ID, relay.sentMessageId);
-  assert.ok(resolved, "the relayed staff message must be reply-mappable");
-  assert.equal(resolved.chatId, CUSTOMER_CHAT);
-  assert.equal(resolved.orderId, ORDER_A);
+  assert.ok(resolved.ok && resolved.value, "the relayed staff message must be reply-mappable");
+  assert.equal(resolved.value.chatId, CUSTOMER_CHAT);
+  assert.equal(resolved.value.orderId, ORDER_A);
 });
 
 test("native Telegram Reply to a relayed message routes to the correct customer chat", async () => {
@@ -701,30 +799,47 @@ test("non-text customer messages are forwarded to staff and mapped for replies",
   const noticeCall = telegram.calls.find(
     (call) => typeof call.text === "string" && call.text.includes("CUSTOMER ATTACHMENT"),
   );
-  assert.ok(await service.resolveStaffRelay(STAFF_CHAT_ID, forwardCall.sentMessageId));
-  assert.ok(await service.resolveStaffRelay(STAFF_CHAT_ID, noticeCall.sentMessageId));
+  const forwardMapped = await service.resolveStaffRelay(STAFF_CHAT_ID, forwardCall.sentMessageId);
+  const noticeMapped = await service.resolveStaffRelay(STAFF_CHAT_ID, noticeCall.sentMessageId);
+  assert.ok(forwardMapped.ok && forwardMapped.value);
+  assert.ok(noticeMapped.ok && noticeMapped.value);
 });
 
 /* --------------------------------------------------------------------------
    16-17. Failure isolation and destination control
    -------------------------------------------------------------------------- */
 
-test("a Telegram failure during claim does not unclaim or corrupt the order", async () => {
+test("a failed customer ack stays retryable: the same update succeeds on retry exactly once", async () => {
   const db = createMockDb();
   db.addOrder({ id: ORDER_A, customerId: CUSTOMER_A });
   const token = await issueTokenForOrderA(db);
   const telegram = createMockTelegram();
-  telegram.failNextWith("NETWORK_ERROR");
   const processor = createProcessor(db, telegram);
 
-  await processor.handleUpdate(tgUpdate(1, customerMessage(50, `/start ${token}`)));
+  // First attempt: the Telegram API fails during the customer ack.
+  telegram.failNextWith("NETWORK_ERROR");
+  const first = await processor.handleUpdate(tgUpdate(1, customerMessage(50, `/start ${token}`)));
+  assert.equal(first, "failed", "a failed update must be reported as retryable");
 
   const [stored] = [...db.links.values()];
   assert.equal(stored.chatId, CUSTOMER_CHAT, "the claim must survive a failed ack send");
-  assert.equal(telegram.sendsTo(STAFF_CHAT_ID).length, 1, "staff notice is still attempted");
+  assert.equal(telegram.sendsTo(CUSTOMER_CHAT).length, 0);
+  assert.equal(telegram.sendsTo(STAFF_CHAT_ID).length, 0, "no staff message before the ack lands");
+
+  // Telegram redelivers the SAME update: it now succeeds, with no duplicates.
+  const second = await processor.handleUpdate(tgUpdate(1, customerMessage(50, `/start ${token}`)));
+  assert.equal(second, "processed");
+  assert.equal(telegram.sendsTo(CUSTOMER_CHAT).length, 1, "exactly one customer ack");
+  assert.equal(telegram.sendsTo(STAFF_CHAT_ID).length, 1, "exactly one connection notice");
+
+  // A third delivery of the same update is a duplicate: ignored.
+  const third = await processor.handleUpdate(tgUpdate(1, customerMessage(50, `/start ${token}`)));
+  assert.equal(third, "skipped");
+  assert.equal(telegram.sendsTo(CUSTOMER_CHAT).length, 1);
+  assert.equal(telegram.sendsTo(STAFF_CHAT_ID).length, 1);
 });
 
-test("a failed staff reply reports failure without touching database state", async () => {
+test("a permanently undeliverable staff reply informs the admin instead of retrying forever", async () => {
   const db = createMockDb();
   db.addOrder({ id: ORDER_A, customerId: CUSTOMER_A });
   const token = await issueTokenForOrderA(db);
@@ -734,16 +849,51 @@ test("a failed staff reply reports failure without touching database state", asy
   await processor.handleUpdate(tgUpdate(1, customerMessage(50, `/start ${token}`)));
   const notice = telegram.calls.find((call) => call.text.includes("ORDER CONNECTED ON TELEGRAM"));
 
-  // The next send (the customer delivery) fails; the confirmation must say so.
+  // The customer blocked the bot: HTTP 403 can never succeed on retry.
   telegram.failNextWith("HTTP_403");
-  await processor.handleUpdate(
+  const outcome = await processor.handleUpdate(
     tgUpdate(2, staffReplyMessage(71, Number(notice.sentMessageId), "Are you there?")),
   );
 
+  assert.equal(outcome, "processed", "a permanent failure must not stay retryable forever");
   const failureNotices = telegram.calls.filter((call) => call.text.includes("Could not deliver"));
   assert.equal(failureNotices.length, 1, "the admin must learn the reply did not arrive");
+  assert.equal(failureNotices[0].chatId, STAFF_CHAT_ID);
   const [stored] = [...db.links.values()];
   assert.equal(stored.chatId, CUSTOMER_CHAT, "connection state must be untouched");
+});
+
+test("a transient staff-reply failure is retried and delivered exactly once", async () => {
+  const db = createMockDb();
+  db.addOrder({ id: ORDER_A, customerId: CUSTOMER_A });
+  const token = await issueTokenForOrderA(db);
+  const telegram = createMockTelegram();
+  const processor = createProcessor(db, telegram);
+
+  await processor.handleUpdate(tgUpdate(1, customerMessage(50, `/start ${token}`)));
+  const notice = telegram.calls.find((call) => call.text.includes("ORDER CONNECTED ON TELEGRAM"));
+
+  // First attempt: the delivery to the customer fails transiently.
+  telegram.failNextWith("NETWORK_ERROR");
+  const first = await processor.handleUpdate(
+    tgUpdate(2, staffReplyMessage(71, Number(notice.sentMessageId), "Are you there?")),
+  );
+  assert.equal(first, "failed");
+  assert.equal(
+    telegram.sendsTo(CUSTOMER_CHAT).filter((call) => call.text.includes("Are you there?")).length,
+    0,
+    "the reply must not have been delivered",
+  );
+  assert.equal(telegram.calls.filter((call) => call.text.includes("Could not deliver")).length, 0);
+
+  // Retry: delivered once, confirmed once.
+  const second = await processor.handleUpdate(
+    tgUpdate(2, staffReplyMessage(71, Number(notice.sentMessageId), "Are you there?")),
+  );
+  assert.equal(second, "processed");
+  const deliveries = telegram.sendsTo(CUSTOMER_CHAT).filter((call) => call.text.includes("Are you there?"));
+  assert.equal(deliveries.length, 1, "exactly one delivery to the customer");
+  assert.equal(telegram.calls.filter((call) => call.text.includes("Reply delivered")).length, 1);
 });
 
 test("customers can never influence the destination chat of any bot message", async () => {
@@ -855,8 +1005,9 @@ test("two customers connected simultaneously relay and reply independently", asy
   const service2 = createService(db);
   const aliceMapping = await service2.resolveStaffRelay(STAFF_CHAT_ID, aliceRelay.sentMessageId);
   const bobMapping = await service2.resolveStaffRelay(STAFF_CHAT_ID, bobRelay.sentMessageId);
-  assert.equal(aliceMapping.chatId, CUSTOMER_CHAT);
-  assert.equal(bobMapping.chatId, OTHER_CHAT);
+  assert.ok(aliceMapping.ok && bobMapping.ok);
+  assert.equal(aliceMapping.value.chatId, CUSTOMER_CHAT);
+  assert.equal(bobMapping.value.chatId, OTHER_CHAT);
 });
 
 test("one chat with two orders relays with both references and routes to the chat", async () => {
@@ -1063,6 +1214,260 @@ test("unsupported chat types never reach customer or staff paths", async () => {
   assert.equal([...db.links.values()][0].chatId, null);
 });
 
+
+/* --------------------------------------------------------------------------
+   Webhook retry safety: claim/lease/done ledger, retry without duplicates
+   -------------------------------------------------------------------------- */
+
+test("ledger semantics: claim, in-flight, done, release, and reclaim with markers", async () => {
+  const db = createMockDb();
+  const service = createService(db);
+
+  const first = await service.claimUpdate("501");
+  assert.equal(first.kind, "claimed");
+  assert.equal(first.markers.customerMessageId, null);
+
+  // A concurrent duplicate sees a live lease and skips.
+  const concurrent = await service.claimUpdate("501");
+  assert.equal(concurrent.kind, "in-flight");
+
+  // Markers written while processing are preserved for a later reclaim.
+  assert.equal(await service.recordUpdateOutbound("501", { customerMessageId: "77" }), true);
+  assert.equal(await service.completeUpdate("501"), true);
+
+  // A completed update is permanently deduplicated.
+  const afterDone = await service.claimUpdate("501");
+  assert.equal(afterDone.kind, "done");
+
+  // A failed attempt releases its lease; a retry steals it and keeps markers.
+  const fresh = await service.claimUpdate("502");
+  assert.equal(fresh.kind, "claimed");
+  assert.equal(await service.recordUpdateOutbound("502", { staffReplyMessageId: "88" }), true);
+  assert.equal(await service.releaseUpdate("502"), true);
+  const reclaimed = await service.claimUpdate("502");
+  assert.equal(reclaimed.kind, "reclaimed");
+  assert.equal(reclaimed.attempts, 2);
+  assert.equal(reclaimed.markers.staffReplyMessageId, "88");
+});
+
+test("an in-flight lease blocks processing until it expires, then a retry takes over", async () => {
+  const db = createMockDb();
+  db.addOrder({ id: ORDER_A, customerId: CUSTOMER_A });
+  const telegram = createMockTelegram();
+  const processor = createProcessor(db, telegram);
+
+  // Simulate another live delivery holding the lease.
+  const service = createService(db);
+  await service.claimUpdate("900");
+  const blocked = await processor.handleUpdate(tgUpdate(900, customerMessage(60, "hello?")));
+  assert.equal(blocked, "skipped");
+  assert.equal(telegram.calls.length, 0, "a lease held elsewhere must not be processed twice");
+
+  // Once the lease expires (crashed holder), the redelivery takes over.
+  db.events.get("900").leaseUntil = new Date(Date.now() - 1000);
+  const taken = await processor.handleUpdate(tgUpdate(900, customerMessage(60, "hello?")));
+  assert.equal(taken, "processed");
+  assert.equal(telegram.sendsTo(CUSTOMER_CHAT).length, 1);
+});
+
+test("first attempt fails mid-relay: retry sends exactly one staff message and mapping", async () => {
+  const db = createMockDb();
+  db.addOrder({ id: ORDER_A, customerId: CUSTOMER_A });
+  const token = await issueTokenForOrderA(db);
+  const telegram = createMockTelegram();
+  const processor = createProcessor(db, telegram);
+
+  await processor.handleUpdate(tgUpdate(1, customerMessage(50, `/start ${token}`)));
+
+  // Attempt 1: the relay send to staff fails transiently.
+  telegram.failNextWith("NETWORK_ERROR");
+  const first = await processor.handleUpdate(tgUpdate(2, customerMessage(51, "Hi, how do I pay?")));
+  assert.equal(first, "failed");
+  assert.equal(telegram.sendsTo(STAFF_CHAT_ID).length, 1, "only the connection notice so far");
+
+  // Attempt 2 (Telegram redelivery of the SAME update): succeeds.
+  const second = await processor.handleUpdate(tgUpdate(2, customerMessage(51, "Hi, how do I pay?")));
+  assert.equal(second, "processed");
+
+  const relays = telegram.sendsTo(STAFF_CHAT_ID).filter((call) => call.text.includes("CUSTOMER MESSAGE"));
+  assert.equal(relays.length, 1, "the retry must not duplicate the staff relay");
+
+  const service = createService(db);
+  const mapping = await service.resolveStaffRelay(STAFF_CHAT_ID, relays[0].sentMessageId);
+  assert.ok(mapping.ok && mapping.value);
+  assert.equal(mapping.value.chatId, CUSTOMER_CHAT);
+  assert.equal(
+    [...db.relays.values()].filter((row) => row.sourceKind === "relay").length,
+    1,
+    "exactly one relay mapping row",
+  );
+
+  // A third delivery is a plain duplicate.
+  const third = await processor.handleUpdate(tgUpdate(2, customerMessage(51, "Hi, how do I pay?")));
+  assert.equal(third, "skipped");
+  assert.equal(telegram.sendsTo(STAFF_CHAT_ID).length, 2);
+});
+
+test("relay delivered but completion fails: retry does not duplicate the staff message", async () => {
+  const db = createMockDb();
+  db.addOrder({ id: ORDER_A, customerId: CUSTOMER_A });
+  const token = await issueTokenForOrderA(db);
+  const telegram = createMockTelegram();
+  const processor = createProcessor(db, telegram);
+
+  await processor.handleUpdate(tgUpdate(1, customerMessage(50, `/start ${token}`)));
+  const sendsAfterConnect = telegram.sendsTo(STAFF_CHAT_ID).length;
+
+  // Event writes for the relay update: 1 claim, 2 completion. Fail the completion
+  // AFTER the relay was sent and mapped (the crash-before-done window).
+  db.failEventWriteAt(2);
+  const first = await processor.handleUpdate(tgUpdate(2, customerMessage(51, "payment?")));
+  assert.equal(first, "failed");
+  assert.equal(telegram.sendsTo(STAFF_CHAT_ID).length, sendsAfterConnect + 1);
+
+  // Retry: the source-keyed mapping makes the processor skip the re-send.
+  const second = await processor.handleUpdate(tgUpdate(2, customerMessage(51, "payment?")));
+  assert.equal(second, "processed");
+  assert.equal(telegram.sendsTo(STAFF_CHAT_ID).length, sendsAfterConnect + 1, "no duplicate relay");
+});
+
+test("reply delivered but completion fails: retry does not duplicate the customer message", async () => {
+  const db = createMockDb();
+  db.addOrder({ id: ORDER_A, customerId: CUSTOMER_A });
+  const token = await issueTokenForOrderA(db);
+  const telegram = createMockTelegram();
+  const processor = createProcessor(db, telegram);
+
+  await processor.handleUpdate(tgUpdate(1, customerMessage(50, `/start ${token}`)));
+  const notice = telegram.calls.find((call) => call.text.includes("ORDER CONNECTED ON TELEGRAM"));
+
+  // Event writes for the staff-reply update: 1 claim, 2 reply marker, 3 completion.
+  db.failEventWriteAt(3);
+  const first = await processor.handleUpdate(
+    tgUpdate(2, staffReplyMessage(71, Number(notice.sentMessageId), "You can pay via ABA.")),
+  );
+  assert.equal(first, "failed");
+  assert.equal(telegram.sendsTo(CUSTOMER_CHAT).filter((c) => c.text.includes("ABA")).length, 1);
+
+  // Retry: the reply marker makes the processor skip the re-delivery.
+  const second = await processor.handleUpdate(
+    tgUpdate(2, staffReplyMessage(71, Number(notice.sentMessageId), "You can pay via ABA.")),
+  );
+  assert.equal(second, "processed");
+  assert.equal(
+    telegram.sendsTo(CUSTOMER_CHAT).filter((c) => c.text.includes("ABA")).length,
+    1,
+    "the customer must never receive the reply twice",
+  );
+});
+
+test("concurrent duplicate deliveries: exactly one processing path succeeds", async () => {
+  const db = createMockDb();
+  db.addOrder({ id: ORDER_A, customerId: CUSTOMER_A });
+  const token = await issueTokenForOrderA(db);
+  const telegram = createMockTelegram();
+  const processor = createProcessor(db, telegram);
+
+  await processor.handleUpdate(tgUpdate(1, customerMessage(50, `/start ${token}`)));
+  const staffSendsBefore = telegram.sendsTo(STAFF_CHAT_ID).length;
+
+  const duplicate = tgUpdate(2, customerMessage(51, "Hi, how do I pay?"));
+  const outcomes = await Promise.all([
+    processor.handleUpdate(duplicate),
+    processor.handleUpdate(duplicate),
+  ]);
+
+  assert.deepEqual(outcomes.sort(), ["processed", "skipped"]);
+  const relays = telegram.sendsTo(STAFF_CHAT_ID).filter((call) => call.text.includes("CUSTOMER MESSAGE"));
+  assert.equal(relays.length, 1, "only one relay may be produced");
+  assert.equal(
+    [...db.relays.values()].filter((row) => row.sourceKind === "relay").length,
+    1,
+    "only one mapping row may exist",
+  );
+  assert.equal(telegram.sendsTo(STAFF_CHAT_ID).length, staffSendsBefore + 1);
+});
+
+test("retries of a connection update fill gaps instead of duplicating: ack crash window", async () => {
+  const db = createMockDb();
+  db.addOrder({ id: ORDER_A, customerId: CUSTOMER_A });
+  const token = await issueTokenForOrderA(db);
+  const telegram = createMockTelegram();
+  const processor = createProcessor(db, telegram);
+
+  // Crash after the customer ack was delivered but before the update completed.
+  // Event writes: 1 claim, 2 ack marker, 3 completion.
+  db.failEventWriteAt(3);
+  const first = await processor.handleUpdate(tgUpdate(1, customerMessage(50, `/start ${token}`)));
+  assert.equal(first, "failed");
+  assert.equal(telegram.sendsTo(CUSTOMER_CHAT).length, 1, "ack was delivered");
+  assert.equal(telegram.sendsTo(STAFF_CHAT_ID).length, 1, "notice was delivered");
+
+  // Retry: nothing is re-sent; the update simply completes.
+  const second = await processor.handleUpdate(tgUpdate(1, customerMessage(50, `/start ${token}`)));
+  assert.equal(second, "processed");
+  assert.equal(telegram.sendsTo(CUSTOMER_CHAT).length, 1, "no duplicate ack");
+  assert.equal(telegram.sendsTo(STAFF_CHAT_ID).length, 1, "no duplicate notice");
+});
+
+test("unavailable event ledger fails the update instead of silently dropping it", async () => {
+  const db = createMockDb();
+  db.addOrder({ id: ORDER_A, customerId: CUSTOMER_A });
+  const token = await issueTokenForOrderA(db);
+  const telegram = createMockTelegram();
+  const processor = createProcessor(db, telegram);
+
+  // The claim write itself fails (database blip): the update must stay
+  // retryable, not be dropped — otherwise Telegram would never redeliver.
+  db.failNextEventWrite();
+  const outcome = await processor.handleUpdate(tgUpdate(1, customerMessage(50, `/start ${token}`)));
+  assert.equal(outcome, "failed");
+  assert.equal(telegram.calls.length, 0, "nothing is sent without a claim");
+
+  const second = await processor.handleUpdate(tgUpdate(1, customerMessage(50, `/start ${token}`)));
+  assert.equal(second, "processed");
+  assert.equal(telegram.sendsTo(CUSTOMER_CHAT).length, 1);
+});
+
+/* --------------------------------------------------------------------------
+   Webhook route behavior: 401 before everything, 500 only as the retry signal
+   -------------------------------------------------------------------------- */
+
+test("route: invalid secret is 401 before parsing; authorized garbage is 200; failures are 500", async () => {
+  const previousSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
+  process.env.TELEGRAM_WEBHOOK_SECRET = "route-test-secret";
+  try {
+    const { POST } = await import("../src/app/api/telegram/webhook/route.ts");
+    const request = (body, secret) =>
+      new Request("https://devkitcat.test/api/telegram/webhook", {
+        method: "POST",
+        headers: secret ? { "x-telegram-bot-api-secret-token": secret } : {},
+        body,
+      });
+
+    // Wrong and missing secrets: 401 before the body is even read.
+    const wrong = await POST(request("{}", "wrong-secret"));
+    assert.equal(wrong.status, 401);
+    const missing = await POST(request("{}"));
+    assert.equal(missing.status, 401);
+
+    // Authorized but unparseable body: nothing retryable, answer 200.
+    const garbage = await POST(request("not-json", "route-test-secret"));
+    assert.equal(garbage.status, 200);
+
+    // Authorized, parseable, but no database configured in this test process:
+    // the update cannot be processed, so the route must answer 500 so Telegram
+    // retries instead of dropping the message.
+    const update = await POST(
+      request(JSON.stringify({ update_id: 1, message: { message_id: 1, chat: { id: 1, type: "private" }, text: "hi" } }), "route-test-secret"),
+    );
+    assert.equal(update.status, 500);
+  } finally {
+    if (previousSecret === undefined) delete process.env.TELEGRAM_WEBHOOK_SECRET;
+    else process.env.TELEGRAM_WEBHOOK_SECRET = previousSecret;
+  }
+});
+
 /* --------------------------------------------------------------------------
    18. Nothing unsafe is exposed
    -------------------------------------------------------------------------- */
@@ -1122,7 +1527,7 @@ test("Telegram secrets never appear in client-reachable or page sources", async 
   }
 });
 
-test("the webhook authorizes before it parses and never returns 5xx by design", async () => {
+test("the webhook authorizes before it parses and uses 500 only as the retry signal", async () => {
   const route = await readSource("src/app/api/telegram/webhook/route.ts");
   const authorizeIndex = route.indexOf("isAuthorizedWebhookRequest");
   const parseIndex = route.indexOf("request.json()");
@@ -1131,7 +1536,10 @@ test("the webhook authorizes before it parses and never returns 5xx by design", 
   assert.ok(authorizeIndex < parseIndex, "authorization must happen before body parsing");
   assert.match(route, /status: 401/);
   assert.match(route, /status: 200/);
-  assert.doesNotMatch(route, /status: 500/);
+  // 500 is the deliberate "left retryable" answer that makes Telegram redeliver;
+  // the body is always empty so no detail ever leaks.
+  assert.match(route, /status: outcome === "failed" \? 500 : 200/);
+  assert.doesNotMatch(route, /status: 502/);
 });
 
 test("checkout no longer collects a Telegram username", async () => {

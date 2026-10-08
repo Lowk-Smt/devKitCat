@@ -34,6 +34,14 @@ export const TELEGRAM_LINK_TTL_DAYS_MIN = 1;
 export const TELEGRAM_LINK_TTL_DAYS_MAX = 30;
 export const TELEGRAM_LINK_TTL_DAYS_ENV_VAR = "TELEGRAM_LINK_TTL_DAYS";
 
+/**
+ * How long one webhook delivery owns an update while processing it. Covers the
+ * worst case of a handler (a few database writes plus up to three Bot API
+ * calls at 5s timeout each); an expired lease lets a Telegram redelivery steal
+ * the update instead of waiting forever after a crashed attempt.
+ */
+export const TELEGRAM_UPDATE_LEASE_MS = 90_000;
+
 /** Environment variables that must never appear in client bundles or logs. */
 export const TELEGRAM_SERVER_ENV_VARS = [
   "TELEGRAM_BOT_TOKEN",

@@ -53,12 +53,20 @@ const RELAY_COLUMNS = [
   { name: "linkId", nullable: false, maxLen: null },
   { name: "staffChatId", nullable: false, maxLen: 32 },
   { name: "staffMessageId", nullable: false, maxLen: 32 },
+  { name: "sourceUpdateId", nullable: true, maxLen: 24 },
+  { name: "sourceKind", nullable: true, maxLen: 16 },
   { name: "createdAt", nullable: false, maxLen: null },
 ];
 
 const EVENT_COLUMNS = [
   { name: "updateId", nullable: false, maxLen: 24 },
+  { name: "status", nullable: false, maxLen: 16 },
+  { name: "leaseUntil", nullable: true, maxLen: null },
+  { name: "attempts", nullable: false, maxLen: null },
+  { name: "customerMessageId", nullable: true, maxLen: 32 },
+  { name: "staffReplyMessageId", nullable: true, maxLen: 32 },
   { name: "receivedAt", nullable: false, maxLen: null },
+  { name: "updatedAt", nullable: false, maxLen: null },
 ];
 
 async function verifyTables(queryFn, schemaName) {
@@ -117,6 +125,9 @@ async function verifyTables(queryFn, schemaName) {
   if (!defs["OrderTelegramLink_chatId_idx"]) {
     throw new Error("Expected index OrderTelegramLink_chatId_idx is missing");
   }
+  if (!defs["TelegramStaffRelay_sourceUpdateId_idx"]) {
+    throw new Error("Expected index TelegramStaffRelay_sourceUpdateId_idx is missing");
+  }
 
   // The foreign key must cascade from Order so removing an order removes its
   // connection instead of leaving orphaned links.
@@ -163,6 +174,11 @@ async function verifyTables(queryFn, schemaName) {
     /orderId\s+String\s+@unique/,
     /chatId\s+String\?\s+@db\.VarChar\(32\)/,
     /telegramLink\s+OrderTelegramLink\?/,
+    /sourceUpdateId\s+String\?\s+@db\.VarChar\(24\)/,
+    /status\s+String\s+@default\("processing"\)\s+@db\.VarChar\(16\)/,
+    /leaseUntil\s+DateTime\?\s+@db\.Timestamptz\(3\)/,
+    /customerMessageId\s+String\?\s+@db\.VarChar\(32\)/,
+    /staffReplyMessageId\s+String\?\s+@db\.VarChar\(32\)/,
   ]) {
     if (!expected.test(schema)) {
       throw new Error(`schema.prisma missing expected pattern: ${expected}`);
