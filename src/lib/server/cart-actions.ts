@@ -143,9 +143,10 @@ export async function placeOrderAction(
 
   const customerName = formData.get("customerName");
   const customerPhone = formData.get("customerPhone");
-  const telegramHandle = formData.get("telegramHandle");
 
-  // Phone number is required for manual fulfillment
+  // Phone number is required for manual fulfillment; Telegram is connected
+  // after checkout via the order page's one-time deep link, so no Telegram
+  // username is collected here anymore.
   if (typeof customerPhone !== "string" || !customerPhone.trim()) {
     return {
       status: "error",
@@ -161,7 +162,6 @@ export async function placeOrderAction(
     reviewedSubtotalCents: formData.get("reviewedSubtotalCents"),
     customerName,
     customerPhone,
-    telegramHandle,
   });
 
   if (!result.ok) {

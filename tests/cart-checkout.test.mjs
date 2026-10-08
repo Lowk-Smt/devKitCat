@@ -967,9 +967,11 @@ test("cart Server Functions authorize before touching the cart", async () => {
   assert.equal(source.match(/await requireCustomer\(\)/g).length, 5);
   assert.match(source, /const customer = await getAuthenticatedCustomer\(\);/);
   // The form fields: verification tokens alongside customer contact details.
+  // Telegram is connected after checkout via a one-time deep link, so no
+  // Telegram username is collected here anymore.
   assert.deepEqual(
     [...source.matchAll(/formData\.get\("([^"]+)"\)/g)].map((match) => match[1]).sort(),
-    ["customerName", "customerPhone", "idempotencyKey", "reviewedSubtotalCents", "telegramHandle"],
+    ["customerName", "customerPhone", "idempotencyKey", "reviewedSubtotalCents"],
   );
   // No action returns raw failure codes or stack traces to the client.
   assert.doesNotMatch(source, /message: (result|error)\.message/);
@@ -1050,11 +1052,13 @@ test("client cart components never send prices, totals, or ownership", async () 
   }
 
   // The submission form carries the verification tokens and contact fields.
+  // No Telegram username field: Telegram is connected from the order page.
   const submit = await readSource("src/components/checkout/CheckoutSubmit.tsx");
   assert.deepEqual(
     [...submit.matchAll(/name="([^"]+)"/g)].map((match) => match[1]).sort(),
-    ["customerName", "customerPhone", "idempotencyKey", "reviewedSubtotalCents", "telegramHandle"],
+    ["customerName", "customerPhone", "idempotencyKey", "reviewedSubtotalCents"],
   );
+  assert.doesNotMatch(submit, /telegramHandle/);
 
   // No Prisma or server-only import leaks into a client bundle.
   for (const modulePath of [...modules, "src/components/checkout/CheckoutSubmit.tsx"]) {

@@ -10,6 +10,13 @@ import { firstSearchParam, isUnpaidOrderStatus } from "@/lib/account-presentatio
 import { formatDate } from "@/lib/catalog";
 import { requireCustomer } from "@/lib/server/auth";
 import { getCustomerOrderById } from "@/lib/server/data-access";
+import { startTelegramConnectionAction } from "@/lib/server/telegram-link-actions";
+import {
+  isTelegramBotConfigured,
+  resolveLinkTtlDays,
+  resolveTelegramNotice,
+} from "@/lib/server/telegram-link-core";
+import { telegramLinks } from "@/lib/server/telegram-link";
 import styles from "@/components/account/AccountPage.module.css";
 
 export default async function OrderDetailPage({
@@ -30,6 +37,20 @@ export default async function OrderDetailPage({
   const justPlaced =
     firstSearchParam(query.placed) === "1" && isUnpaidOrderStatus(order.status);
   const isUnpaid = isUnpaidOrderStatus(order.status);
+
+  // Allowlisted result notice from the Telegram Server Function.
+  const telegramNotice = resolveTelegramNotice(query.telegram);
+
+  // When the bot is configured, the order page owns the connection: it shows
+  // the live one-click deep link, or the connected state once the customer has
+  // pressed Start. When it is not, the static support-chat fallback below keeps
+  // the previous behavior.
+  const botConfigured = isUnpaid && isTelegramBotConfigured();
+  const connection = botConfigured
+    ? await telegramLinks.getConnection(customer.id, order.id)
+    : null;
+  const connected =
+    connection?.ok && connection.value?.state === "connected" ? connection.value : null;
 
   const rawContactUrl = process.env.NEXT_PUBLIC_TELEGRAM_CONTACT_URL?.trim();
   const telegramContactUrl = rawContactUrl
@@ -53,7 +74,72 @@ export default async function OrderDetailPage({
         </div>
       ) : null}
 
-      {isUnpaid ? (
+      {isUnpaid && telegramNotice ? (
+        <p className={styles.telegramNotice} role="status">
+          {telegramNotice === "connected"
+            ? "This order is already connected to a Telegram account."
+            : telegramNotice === "unavailable"
+              ? "Telegram is temporarily unavailable. Please try again in a moment."
+              : "We could not start the Telegram connection. Please try again."}
+        </p>
+      ) : null}
+
+      {isUnpaid && botConfigured ? (
+        <section
+          className={styles.telegramActionCard}
+          aria-labelledby="next-steps-heading"
+        >
+          <div className={styles.telegramActionHeader}>
+            <span className={styles.telegramActionIcon} aria-hidden="true">
+              <Icon name={connected ? "check" : "info"} size={20} />
+            </span>
+            <div>
+              <h2 id="next-steps-heading" className={styles.telegramActionTitle}>
+                {connected ? "Telegram connected ✓" : "Order received"}
+              </h2>
+              <p className={styles.telegramActionSubtitle}>
+                {connected ? (
+                  <>
+                    This order is connected to your Telegram
+                    {connected.telegramName ? (
+                      <> as <strong>{connected.telegramName}</strong></>
+                    ) : null}
+                    . Our team will message you there about payment and delivery — you
+                    can reply at any time.
+                  </>
+                ) : (
+                  <>
+                    Your order is saved. Tap <strong>Start Telegram</strong> to open our
+                    bot and connect this order — we will confirm payment and delivery
+                    with you there. Your name and phone number are already on file, so
+                    you will not be asked for them again.
+                  </>
+                )}
+              </p>
+            </div>
+          </div>
+
+          <div className={styles.telegramActionButtons}>
+            <form action={startTelegramConnectionAction}>
+              <input type="hidden" name="orderId" value={order.id} />
+              {connected ? <input type="hidden" name="rebind" value="1" /> : null}
+              <Button type="submit" variant={connected ? "secondary" : "primary"}>
+                {connected ? "Use a different Telegram account" : "Start Telegram"}
+                {!connected ? <Icon name="arrow-up-right" size={16} /> : null}
+              </Button>
+            </form>
+            {!connected ? (
+              <p className={styles.telegramManualNote}>
+                Opens a one-time connection link that expires in{" "}
+                {resolveLinkTtlDays()}{" "}
+                {resolveLinkTtlDays() === 1 ? "day" : "days"}.
+              </p>
+            ) : null}
+          </div>
+        </section>
+      ) : null}
+
+      {isUnpaid && !botConfigured ? (
         <section
           className={styles.telegramActionCard}
           aria-labelledby="next-steps-heading"

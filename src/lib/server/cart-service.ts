@@ -88,7 +88,12 @@ export interface CheckoutInput {
   customerName?: unknown;
   /** Customer's contact phone number for manual payment and fulfillment. */
   customerPhone?: unknown;
-  /** Optional customer Telegram handle (e.g. @username). */
+  /**
+   * Legacy, optional Telegram username. Checkout no longer collects it —
+   * Telegram is connected after checkout via a one-time deep link — but the
+   * server-side normalization stays so the column and older payloads keep
+   * working. New orders always leave it null.
+   */
   telegramHandle?: unknown;
 }
 

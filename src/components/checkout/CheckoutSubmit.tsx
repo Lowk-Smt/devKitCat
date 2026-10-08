@@ -22,8 +22,10 @@ interface CheckoutSubmitProps {
 /**
  * The order submission form.
  *
- * Posts the server-generated checkout tokens alongside contact details:
- * full name, phone number, and optional Telegram username.
+ * Posts the server-generated checkout tokens alongside the two contact details
+ * manual fulfillment needs: full name and phone number. Telegram is connected
+ * *after* checkout, from the order page's one-time deep link — no username is
+ * collected here, and the phone number is entered exactly once.
  * `placeOrderAction` re-authenticates, re-reads the cart, recomputes the total
  * from current catalog prices, validates contact details, and refuses the order
  * if tampered or stale.
@@ -80,23 +82,9 @@ export function CheckoutSubmit({
           placeholder="+1 (555) 000-0000"
         />
         <span className={styles.fieldHint}>
-          Required to confirm payment and coordinate fulfillment.
+          Required to confirm payment and coordinate fulfillment. After you place the
+          order, you can connect Telegram from the confirmation page.
         </span>
-      </div>
-
-      <div className={styles.fieldGroup}>
-        <label htmlFor="checkout-telegram" className={styles.label}>
-          Telegram username <span className={styles.optional}>(optional)</span>
-        </label>
-        <input
-          id="checkout-telegram"
-          type="text"
-          name="telegramHandle"
-          autoComplete="off"
-          maxLength={64}
-          className={styles.input}
-          placeholder="@username"
-        />
       </div>
 
       {state.status === "error" && state.message ? (

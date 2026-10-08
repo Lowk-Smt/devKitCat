@@ -252,6 +252,9 @@ model Order {
   currency       String      @default("USD") @db.VarChar(3)
   customerName   String?     @db.VarChar(120)
   customerPhone  String?     @db.VarChar(32)
+  /// Historical: checkout collected an optional Telegram username until the
+  /// deep-link connection flow replaced it. Kept for old rows; nothing writes
+  /// it anymore.
   telegramHandle String?     @db.VarChar(64)
   /// Client-supplied, server-validated checkout token. It lets a retried or
   /// double-submitted checkout resolve to the order it already created instead
@@ -261,8 +264,9 @@ model Order {
   createdAt      DateTime  @default(now()) @db.Timestamptz(3)
   updatedAt      DateTime  @updatedAt @db.Timestamptz(3)
 
-  customer Customer    @relation(fields: [customerId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  items    OrderItem[]
+  customer     Customer            @relation(fields: [customerId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  items        OrderItem[]
+  telegramLink OrderTelegramLink?
 
   @@unique([customerId, idempotencyKey])
   @@index([customerId, createdAt])
@@ -307,4 +311,65 @@ model Download {
 
   @@index([customerId, createdAt])
   @@index([productId])
+}
+
+/// One order's Telegram connection: a one-time deep-link token (stored only as
+/// a SHA-256 hash) and, once the customer presses Start in the bot, the private
+/// chat that order conversations happen in.
+///
+/// The raw token is never persisted — like `Session.tokenHash`, a database leak
+/// cannot be replayed as a link. `orderId` is unique, so an order has at most
+/// one connection row; issuing a fresh link updates this row (new token,
+/// cleared claim) rather than creating a second one. Connection status is
+/// derived, not stored: `chatId` set means connected, an unconsumed row whose
+/// `expiresAt` has passed is simply an expired link.
+model OrderTelegramLink {
+  id           String    @id @default(cuid())
+  orderId      String    @unique
+  /// SHA-256 hex of the raw deep-link token; lookups go through this hash.
+  tokenHash    String    @unique @db.VarChar(64)
+  expiresAt    DateTime  @db.Timestamptz(3)
+  /// Set exactly once, by the atomic claim, when the customer presses Start.
+  consumedAt   DateTime? @db.Timestamptz(3)
+  /// Telegram private-chat id of the connected customer (numeral string, so
+  /// int64 chat ids stay exact). Null until the token is claimed.
+  chatId       String?   @db.VarChar(32)
+  connectedAt  DateTime? @db.Timestamptz(3)
+  /// Telegram profile name at connect time, shown to staff for orientation.
+  telegramName String?   @db.VarChar(120)
+  createdAt    DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime  @updatedAt @db.Timestamptz(3)
+
+  order  Order                @relation(fields: [orderId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  relays TelegramStaffRelay[]
+
+  @@index([chatId])
+}
+
+/// Maps one relayed staff-chat message to the customer chat that sent it, so
+/// the owner can answer with Telegram's normal Reply action and the webhook can
+/// route the reply to the right customer. Identifier rows only — never message
+/// content — so this is routing state, not a conversation history.
+model TelegramStaffRelay {
+  id             String   @id @default(cuid())
+  linkId         String
+  staffChatId    String   @db.VarChar(32)
+  /// The message id our bot received from Telegram for its own relayed message
+  /// in the staff chat. Unique per staff chat, which is what makes a native
+  /// Telegram Reply resolvable to exactly one customer connection.
+  staffMessageId String   @db.VarChar(32)
+  createdAt      DateTime @default(now()) @db.Timestamptz(3)
+
+  link OrderTelegramLink @relation(fields: [linkId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([staffChatId, staffMessageId])
+  @@index([linkId])
+}
+
+/// Telegram update ids this webhook has already accepted. Telegram redelivers
+/// webhooks that were not acknowledged quickly, so recording the id before
+/// processing makes a retry a no-op instead of a duplicate relay.
+model TelegramWebhookEvent {
+  updateId   String   @id @db.VarChar(24)
+  receivedAt DateTime @default(now()) @db.Timestamptz(3)
 }
