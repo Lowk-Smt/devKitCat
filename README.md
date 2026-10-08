@@ -147,6 +147,8 @@ the first owner is created by hand — see
 | `npm run db:seed:catalog`       | Idempotently seed only categories/products (no demo account records) |
 | `npm run db:grant-owner`        | Review (`dry run`) or write (`--apply`) the initial OWNER grant; requires `DATABASE_URL` |
 | `npm run db:studio`             | Open Prisma Studio against `DATABASE_URL`                          |
+| `npm run db:verify:telegram-link` | Verify the Telegram-link migration in an isolated PGlite scratch schema (additive-only guard) |
+| `node scripts/set-telegram-webhook.mjs --url …` | Register the Telegram webhook (`--info`, `--delete` also available) |
 
 ## Routes
 
@@ -164,6 +166,7 @@ the first owner is created by hand — see
 | `/account/settings` | Profile and preferences, persisted for the signed-in customer |
 | `/checkout`       | The signed-in customer's cart review and order submission (payment not enabled) |
 | `/manage`           | Private product management (drafts, publish/unpublish, delete, staff grants). Requires an explicit `StaffMembership` grant; no public link, `noindex`, never cached |
+| `/api/telegram/webhook` | Telegram bot webhook (secret-header protected; requires `TELEGRAM_WEBHOOK_SECRET`) |
 
 ## Project structure
 
@@ -372,6 +375,82 @@ point, not an oversight. See
 [`docs/pr-12-staff-authorization.md`](docs/pr-12-staff-authorization.md) for the
 full model, the migration status (additive, **not applied anywhere yet**), and the
 rollout and rollback steps.
+
+## Telegram order connection (PR #21)
+
+After checkout, the customer connects Telegram with **one tap**, and all
+order conversation happens in the bot — no phone number is ever re-entered, no
+Telegram username is collected at checkout, and no order ID has to be typed.
+
+### Customer flow
+
+1. The customer checks out with their **name** and **phone number** (both
+   required, validated server-side, stored on the order).
+2. The confirmation page (`/account/purchases/:id?placed=1`) shows
+   **"Order received"** and a primary **"Start Telegram"** button.
+3. The button is a Server Function: it verifies the session owns the unpaid
+   order, mints a fresh one-time token (32 random bytes, base64url), stores only
+   its SHA-256 hash in `OrderTelegramLink`, and redirects to
+   `https://t.me/<bot>?start=<token>`. The raw token exists nowhere but the
+   redirect target; each click rotates the link, so only the newest one works.
+4. The customer presses **Start** in Telegram. The webhook validates the token
+   hash, atomically claims the link (one conditional `UPDATE`; a second chat is
+   rejected), and binds the private chat to that exact order.
+5. The bot tells the customer: *"Thanks! We've received your order DKC-… Please
+   wait for the devKitCat team to respond."* — and the staff chat receives the
+   full order summary (number, customer, phone, items, total).
+
+### Admin flow (Telegram only — no website round-trip)
+
+The configured staff chat (`TELEGRAM_CHAT_ID`) is the conversation surface:
+
+1. Customer messages are relayed into the staff chat as
+   `🔔 CUSTOMER MESSAGE` with order, customer, and phone, followed by the
+   message text (attachments are forwarded unchanged with a context line).
+2. The owner taps Telegram's normal **Reply** on that message. The webhook
+   resolves the replied-to message id through the `TelegramStaffRelay` mapping
+   table and sends the reply text to that customer's chat, confirming with
+   `✅ Reply delivered`.
+3. Replies to old relayed messages keep working (the mapping is durable);
+   replies to unknown messages are ignored; only the configured staff chat can
+   trigger an outbound send, and the destination always comes from the stored
+   connection — never from message content.
+
+### Setup (per deployment)
+
+```bash
+# 1. Create a bot with @BotFather; put the token and your staff chat id in env:
+#    TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, TELEGRAM_WEBHOOK_SECRET (openssl rand -hex 32)
+# 2. Apply migrations, then register the webhook once (and after URL changes):
+node scripts/set-telegram-webhook.mjs --url https://YOUR-SITE/api/telegram/webhook
+```
+
+The webhook route requires the exact secret header (`X-Telegram-Bot-Api-Secret-Token`),
+rejects everything else with 401 before reading the body, and is **retry-safe**:
+each update is claimed in the `TelegramWebhookEvent` ledger (a bounded lease
+keeps concurrent duplicates out, `done` is permanent deduplication), processed
+sends are keyed by the update id so a redelivery never re-sends a message that
+already arrived, and a failed attempt answers **500** so Telegram redelivers
+instead of the message being lost. `TELEGRAM_CHAT_ID` must be the numeric chat
+id (negative for groups). When the bot is *not* configured, the order page
+falls back to the previous `NEXT_PUBLIC_TELEGRAM_CONTACT_URL` card, so nothing
+about today's behavior changes.
+
+### Security model
+
+* Tokens are unrelated to order ids, unguessable, stored hashed, expire (7 days
+  by default, `TELEGRAM_LINK_TTL_DAYS`), and are single-use; unknown, expired,
+  and stolen tokens get one identical refusal that reveals nothing.
+* The order page re-checks ownership before minting or rotating anything; a
+  connected order is never silently unbound — recovery ("Use a different
+  Telegram account") is an explicit second action.
+* `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, and `TELEGRAM_WEBHOOK_SECRET` are
+  server-only and never logged; API error text is redacted before logging.
+* Telegram failures never corrupt orders: sends are typed results awaited after
+  the database commit, exactly like the staff order notification.
+
+The staff Telegram chat is the conversation transcript; devKitCat stores only
+connection state and reply-routing identifiers, deliberately not chat history.
 
 ## 3D previews
 

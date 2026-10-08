@@ -202,6 +202,18 @@
   margin-bottom: 1rem;
 }
 
+/* Allowlisted result notice for the Telegram connection Server Function. */
+.telegramNotice {
+  margin-bottom: 1rem;
+  padding: 0.55rem 0.75rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(93, 125, 249, 0.3);
+  background: rgba(93, 125, 249, 0.08);
+  color: var(--text-muted);
+  font-size: 0.82rem;
+}
+
+
 .telegramActionCard {
   margin-bottom: 1.5rem;
   padding: 1.25rem 1.4rem;
